@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kyntral.invalid/schema/action-envelope.v1.json",
+  "$comment": "SPDX-License-Identifier: Apache-2.0",
+  "title": "Kyntral ActionEnvelope v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "actionId", "scopeId", "deviceId", "workflowId", "capability", "risk", "nonce", "issuedAt", "expiresAt", "idempotencyKey"],
+  "properties": {
+    "version": { "const": "kyntral.action.v1" },
+    "actionId": { "type": "string" },
+    "scopeId": { "type": "string" },
+    "deviceId": { "type": "string" },
+    "workflowId": { "type": "string" },
+    "capability": { "type": "string" },
+    "risk": { "enum": ["K0", "K1", "K2", "K3", "K4"] },
+    "nonce": { "type": "string", "minLength": 16 },
+    "issuedAt": { "type": "string", "format": "date-time" },
+    "expiresAt": { "type": "string", "format": "date-time" },
+    "idempotencyKey": { "type": "string", "minLength": 16 }
+  }
+}

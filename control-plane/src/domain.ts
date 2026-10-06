@@ -1,0 +1,87 @@
+// SPDX-License-Identifier: BUSL-1.1
+
+export type RiskClass = "K0" | "K1" | "K2" | "K3" | "K4";
+
+export type CloudJob = Readonly<{
+  actionId: string;
+  deviceId: string;
+  scopeId: string;
+  workflowId: string;
+  capability: string;
+  risk: RiskClass;
+  state: "queued" | "executing" | "completed" | "failed" | "cancelled";
+  expiresAt: string;
+}>;
+
+export type CloudReceipt = Readonly<{
+  actionId: string;
+  deviceId: string;
+  state: "completed" | "partial" | "failed" | "cancelled";
+  completed: number;
+  failed: number;
+  receiptHash: string;
+  deviceSignature: string;
+}>;
+
+const OPAQUE_ID = /^[a-z][a-z0-9_-]{2,127}$/i;
+
+export function assertOpaqueId(value: string, field: string): string {
+  if (!OPAQUE_ID.test(value)) {
+    throw new Error(`${field} must be an opaque identifier`);
+  }
+  return value;
+}
+
+export function createCloudJob(input: {
+  actionId: string;
+  deviceId: string;
+  scopeId: string;
+  workflowId: string;
+  capability: string;
+  risk: RiskClass;
+  expiresAt: string;
+}): CloudJob {
+  return Object.freeze({
+    actionId: assertOpaqueId(input.actionId, "actionId"),
+    deviceId: assertOpaqueId(input.deviceId, "deviceId"),
+    scopeId: assertOpaqueId(input.scopeId, "scopeId"),
+    workflowId: assertOpaqueId(input.workflowId, "workflowId"),
+    capability: assertOpaqueId(input.capability.replaceAll(".", "_"), "capability").replaceAll("_", "."),
+    risk: input.risk,
+    state: "queued",
+    expiresAt: input.expiresAt
+  });
+}
+
+export const FORBIDDEN_CLOUD_CONTENT_KEYS = new Set([
+  "url",
+  "urls",
+  "note",
+  "noteTitle",
+  "noteText",
+  "clipboard",
+  "filename",
+  "filenames",
+  "fileContents",
+  "media",
+  "mediaBytes",
+  "prompt",
+  "conversation",
+  "contacts",
+  "photos"
+]);
+
+export function assertNoPrivatePayload(value: unknown): void {
+  if (Array.isArray(value)) {
+    for (const item of value) assertNoPrivatePayload(item);
+    return;
+  }
+  if (!value || typeof value !== "object") return;
+
+  for (const [key, nested] of Object.entries(value)) {
+    if (FORBIDDEN_CLOUD_CONTENT_KEYS.has(key)) {
+      throw new Error(`private payload field is forbidden in cloud objects: ${key}`);
+    }
+    assertNoPrivatePayload(nested);
+  }
+}

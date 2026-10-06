@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kyntral.invalid/schema/capability-manifest.v1.json",
+  "$comment": "SPDX-License-Identifier: Apache-2.0",
+  "title": "Kyntral CapabilityManifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "id", "publisher", "risk", "execution", "network", "deviceData"],
+  "properties": {
+    "version": { "const": "kyntral.capability.v1" },
+    "id": { "type": "string" },
+    "publisher": { "type": "string" },
+    "risk": { "enum": ["K0", "K1", "K2", "K3", "K4"] },
+    "execution": { "enum": ["device", "cloud", "hybrid"] },
+    "network": { "type": "boolean" },
+    "networkDomains": { "type": "array", "uniqueItems": true, "items": { "type": "string" } },
+    "deviceData": { "type": "array", "uniqueItems": true, "items": { "type": "string" } }
+  }
+}

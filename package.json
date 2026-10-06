@@ -1,0 +1,25 @@
+{
+  "name": "kyntral",
+  "version": "0.1.0-prealpha",
+  "private": true,
+  "type": "module",
+  "description": "Privacy-first permission layer between AI systems and user-owned devices.",
+  "scripts": {
+    "typecheck": "tsc -p control-plane/tsconfig.json --noEmit",
+    "build": "tsc -p control-plane/tsconfig.json",
+    "test": "vitest run control-plane/tests",
+    "conformance": "vitest run conformance"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/server": "^2.0.0",
+    "zod": "^4.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.9.0",
+    "vitest": "^3.2.0"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

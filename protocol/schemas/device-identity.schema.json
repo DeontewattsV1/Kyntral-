@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kyntral.invalid/schema/device-identity.v1.json",
+  "$comment": "SPDX-License-Identifier: Apache-2.0",
+  "title": "Kyntral DeviceIdentity v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "deviceId", "platform", "signingPublicKey", "agreementPublicKey", "createdAt"],
+  "properties": {
+    "version": { "const": "kyntral.device.v1" },
+    "deviceId": { "type": "string" },
+    "platform": { "enum": ["ios"] },
+    "signingPublicKey": { "type": "string" },
+    "agreementPublicKey": { "type": "string" },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "revokedAt": { "type": "string", "format": "date-time" }
+  }
+}

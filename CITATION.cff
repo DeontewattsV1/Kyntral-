@@ -1,0 +1,11 @@
+cff-version: 1.2.0
+message: "If you use Kyntral Protocol in research, please cite this software."
+title: "Kyntral Protocol"
+type: software
+version: "0.1.0-prealpha"
+date-released: "2026-10-06"
+authors:
+  - family-names: "Watts"
+    given-names: "Deonte"
+repository-code: "https://github.com/DeontewattsV1/Kyntral-"
+license: "Apache-2.0"

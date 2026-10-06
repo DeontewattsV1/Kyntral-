@@ -1,0 +1,13 @@
+{
+  "name": "kyntral",
+  "version": "0.1.0-prealpha",
+  "description": "Permissioned AI-to-device execution.",
+  "skills": "./skills/",
+  "mcpServers": "./mcp.json",
+  "interface": {
+    "displayName": "Kyntral",
+    "shortDescription": "Permissioned AI-to-device execution",
+    "developerName": "Deonte Watts",
+    "brandColor": "#746BFF"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kyntral.invalid/schema/project-scope.v1.json",
+  "$comment": "SPDX-License-Identifier: Apache-2.0",
+  "title": "Kyntral ProjectScope v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "scopeId", "ownerId", "deviceIds", "capabilities", "createdAt"],
+  "properties": {
+    "version": { "const": "kyntral.scope.v1" },
+    "scopeId": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]{2,127}$" },
+    "ownerId": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]{2,127}$" },
+    "deviceIds": { "type": "array", "uniqueItems": true, "items": { "type": "string" } },
+    "capabilities": { "type": "array", "uniqueItems": true, "items": { "type": "string" } },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "expiresAt": { "type": "string", "format": "date-time" },
+    "revokedAt": { "type": "string", "format": "date-time" }
+  }
+}
