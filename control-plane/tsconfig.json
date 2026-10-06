@@ -8,8 +8,8 @@
     "exactOptionalPropertyTypes": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "outDir": "../dist/control-plane",
-    "rootDir": "."
+    "outDir": "../dist",
+    "rootDir": ".."
   },
   "include": ["src/**/*.ts", "tests/**/*.ts", "../conformance/**/*.ts"]
 }
