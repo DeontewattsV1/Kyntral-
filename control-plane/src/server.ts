@@ -129,7 +129,7 @@ export function createKyntralServer(
       }
     },
     async (_args, ctx) => textResult({
-      id: requirePrincipal(ctx.authInfo)
+      id: requirePrincipal(ctx.http?.authInfo)
     })
   );
 
@@ -150,7 +150,7 @@ export function createKyntralServer(
       _meta: securityMeta([KYNTRAL_SCOPES.read])
     },
     async ({ deviceId }, ctx) => {
-      const principalId = requirePrincipal(ctx.authInfo);
+      const principalId = requirePrincipal(ctx.http?.authInfo);
       const id = opaque(deviceId, "deviceId");
       const device = assertOwnsDevice(store, principalId, id);
       return textResult({
@@ -179,7 +179,7 @@ export function createKyntralServer(
       _meta: securityMeta([KYNTRAL_SCOPES.read])
     },
     async ({ scopeId }, ctx) => {
-      requirePrincipal(ctx.authInfo);
+      requirePrincipal(ctx.http?.authInfo);
       return textResult({
         scopeId: opaque(scopeId, "scopeId"),
         supportedCapabilities: [
@@ -212,7 +212,7 @@ export function createKyntralServer(
       _meta: securityMeta([KYNTRAL_SCOPES.read])
     },
     async ({ deviceId, scopeId, workflowId }, ctx) => {
-      const principalId = requirePrincipal(ctx.authInfo);
+      const principalId = requirePrincipal(ctx.http?.authInfo);
       const query = {
         principalId,
         deviceId: opaque(deviceId, "deviceId"),
@@ -257,7 +257,7 @@ export function createKyntralServer(
       _meta: securityMeta([KYNTRAL_SCOPES.execute])
     },
     async ({ deviceId, scopeId, workflowId }, ctx) => {
-      const principalId = requirePrincipal(ctx.authInfo);
+      const principalId = requirePrincipal(ctx.http?.authInfo);
       const query = {
         principalId,
         deviceId: opaque(deviceId, "deviceId"),
@@ -300,7 +300,7 @@ export function createKyntralServer(
       _meta: securityMeta([KYNTRAL_SCOPES.read])
     },
     async ({ actionId }, ctx) => {
-      const principalId = requirePrincipal(ctx.authInfo);
+      const principalId = requirePrincipal(ctx.http?.authInfo);
       const id = opaque(actionId, "actionId");
       const job = store.getJob(id);
       if (!job) throw new Error("Unknown actionId");
@@ -326,7 +326,7 @@ export function createKyntralServer(
       _meta: securityMeta([KYNTRAL_SCOPES.execute])
     },
     async ({ actionId }, ctx) => {
-      const principalId = requirePrincipal(ctx.authInfo);
+      const principalId = requirePrincipal(ctx.http?.authInfo);
       const id = opaque(actionId, "actionId");
       const job = store.getJob(id);
       if (!job) throw new Error("Unknown actionId");
@@ -354,7 +354,7 @@ export function createKyntralServer(
       _meta: securityMeta([KYNTRAL_SCOPES.read])
     },
     async ({ actionId }, ctx) => {
-      const principalId = requirePrincipal(ctx.authInfo);
+      const principalId = requirePrincipal(ctx.http?.authInfo);
       const id = opaque(actionId, "actionId");
       const job = store.getJob(id);
       if (!job) throw new Error("Unknown actionId");
@@ -382,7 +382,7 @@ export function createKyntralServer(
       _meta: securityMeta([KYNTRAL_SCOPES.pair])
     },
     async (_args, ctx) => {
-      const principalId = requirePrincipal(ctx.authInfo);
+      const principalId = requirePrincipal(ctx.http?.authInfo);
       return textResult(createPairingChallenge(store, principalId));
     }
   );
@@ -440,7 +440,7 @@ export function createKyntralServer(
       _meta: securityMeta([KYNTRAL_SCOPES.pair])
     },
     async ({ proof }, ctx) => {
-      const principalId = requirePrincipal(ctx.authInfo);
+      const principalId = requirePrincipal(ctx.http?.authInfo);
       const identity = verifyAndConsumePairingProof({
         store,
         principalId,
@@ -472,7 +472,7 @@ export function createKyntralServer(
       _meta: securityMeta([KYNTRAL_SCOPES.revoke])
     },
     async ({ deviceId }, ctx) => {
-      const principalId = requirePrincipal(ctx.authInfo);
+      const principalId = requirePrincipal(ctx.http?.authInfo);
       const id = opaque(deviceId, "deviceId");
       assertOwnsDevice(store, principalId, id);
       const changed = store.revokeDevice(id);
