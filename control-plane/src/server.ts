@@ -81,7 +81,9 @@ function assertOwnsDevice(
   return device;
 }
 
-export function createKyntralServer(\n  options: KyntralServerOptions\n): McpServer {
+export function createKyntralServer(
+  options: KyntralServerOptions
+): McpServer {
   const store = options.store;
   const authorizationStore =
     options.authorizationStore ?? new PersistentAuthorizationStore(store);
