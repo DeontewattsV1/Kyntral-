@@ -10,13 +10,50 @@ describe("PRIV-001 cloud content boundary", () => {
       deviceId: "dev_123",
       workflowId: "wf_media",
       capability: "workflow.execute",
-      state: "queued"
+      state: "queued",
+      actionHash: "sha256:" + "a".repeat(64)
     })).not.toThrow();
   });
 
-  for (const key of ["url", "noteText", "clipboard", "filename", "mediaBytes", "prompt", "contacts"]) {
-    it(`rejects forbidden cloud field: ${key}`, () => {
+  const forbiddenKeys = [
+    "url", "urls", "noteText", "clipboard", "filename", "fileContents",
+    "content", "body", "payload", "mediaBytes", "prompt", "conversation",
+    "contacts", "photos", "attachments", "email", "phone", "latitude",
+    "longitude", "password", "secret", "credential", "accessToken",
+    "refreshToken"
+  ];
+
+  for (const key of forbiddenKeys) {
+    it("rejects forbidden cloud field: " + key, () => {
       expect(() => assertNoPrivatePayload({ [key]: "secret" })).toThrow();
     });
   }
+});
+
+describe("PRIV-002 payload-like value detection", () => {
+  for (const value of [
+    "https://example.com/private",
+    "file:///private/mobile/note.txt",
+    "someone@example.com"
+  ]) {
+    it("rejects payload-like value: " + value, () => {
+      expect(() => assertNoPrivatePayload({ opaque: value })).toThrow();
+    });
+  }
+});
+
+describe("PRIV-003 nested leakage remains release-blocking", () => {
+  it("rejects private content regardless of nesting depth", () => {
+    expect(() =>
+      assertNoPrivatePayload({
+        metadata: {
+          device: {
+            authorization: {
+              payload: { noteText: "private" }
+            }
+          }
+        }
+      })
+    ).toThrow();
+  });
 });
