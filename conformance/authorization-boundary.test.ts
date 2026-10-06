@@ -10,6 +10,7 @@ describe("AUTHZ-001 fail-closed authorization", () => {
   it("maps an unconfigured authorization backend to Unknown, never Allowed", async () => {
     const store = new DenyByDefaultAuthorizationStore();
     const decision = await store.evaluate({
+      principalId: "usr_123",
       deviceId: "dev_123",
       scopeId: "scope_123",
       workflowId: "wf_123",
