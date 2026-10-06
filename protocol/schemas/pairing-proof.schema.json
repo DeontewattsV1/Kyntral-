@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kyntral.invalid/schema/pairing-proof.v1.json",
+  "$comment": "SPDX-License-Identifier: Apache-2.0",
+  "title": "Kyntral PairingProof v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "challengeId", "nonce", "deviceIdentity", "proof"],
+  "properties": {
+    "version": { "const": "kyntral.pairing-proof.v1" },
+    "challengeId": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]{2,127}$" },
+    "nonce": { "type": "string", "pattern": "^[A-Za-z0-9_-]{43}$" },
+    "deviceIdentity": {
+      "$ref": "device-identity.v1.json"
+    },
+    "proof": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["keyId", "algorithm", "signature"],
+      "properties": {
+        "keyId": { "type": "string", "minLength": 3, "maxLength": 128 },
+        "algorithm": { "const": "ES256" },
+        "signature": { "type": "string", "pattern": "^[A-Za-z0-9_-]+$" }
+      }
+    }
+  }
+}

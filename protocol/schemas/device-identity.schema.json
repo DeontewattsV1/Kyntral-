@@ -5,14 +5,59 @@
   "title": "Kyntral DeviceIdentity v1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["version", "deviceId", "platform", "signingPublicKey", "agreementPublicKey", "createdAt"],
+  "required": [
+    "version",
+    "deviceId",
+    "platform",
+    "signingPublicKey",
+    "keyAgreementPublicKey",
+    "createdAt"
+  ],
   "properties": {
     "version": { "const": "kyntral.device.v1" },
-    "deviceId": { "type": "string" },
+    "deviceId": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]{2,127}$" },
     "platform": { "enum": ["ios"] },
-    "signingPublicKey": { "type": "string" },
-    "agreementPublicKey": { "type": "string" },
+    "signingPublicKey": { "$ref": "#/$defs/signingKey" },
+    "keyAgreementPublicKey": { "$ref": "#/$defs/agreementKey" },
     "createdAt": { "type": "string", "format": "date-time" },
     "revokedAt": { "type": "string", "format": "date-time" }
+  },
+  "$defs": {
+    "baseP256": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kty", "crv", "x", "y", "kid", "use", "alg"],
+      "properties": {
+        "kty": { "const": "EC" },
+        "crv": { "const": "P-256" },
+        "x": { "type": "string", "pattern": "^[A-Za-z0-9_-]{43}$" },
+        "y": { "type": "string", "pattern": "^[A-Za-z0-9_-]{43}$" },
+        "kid": { "type": "string", "minLength": 3, "maxLength": 128 }
+      }
+    },
+    "signingKey": {
+      "allOf": [
+        { "$ref": "#/$defs/baseP256" },
+        {
+          "type": "object",
+          "properties": {
+            "use": { "const": "sig" },
+            "alg": { "const": "ES256" }
+          }
+        }
+      ]
+    },
+    "agreementKey": {
+      "allOf": [
+        { "$ref": "#/$defs/baseP256" },
+        {
+          "type": "object",
+          "properties": {
+            "use": { "const": "enc" },
+            "alg": { "const": "ECDH-ES" }
+          }
+        }
+      ]
+    }
   }
 }

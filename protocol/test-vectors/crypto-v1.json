@@ -1,0 +1,83 @@
+{
+  "canonicalActionUnsigned": "{\"actionId\":\"act_vector_001\",\"capability\":\"workflow.execute\",\"deviceId\":\"dev_vector_001\",\"expiresAt\":\"2026-10-06T23:05:00.000Z\",\"idempotencyKey\":\"idem_vector_0001\",\"issuedAt\":\"2026-10-06T23:00:00.000Z\",\"nonce\":\"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\",\"risk\":\"K2\",\"scopeId\":\"scope_vector_001\",\"version\":\"kyntral.action.v1\",\"workflowId\":\"wf_media_intake\"}",
+  "actionPreimageHex": "4b594e5452414c00616374696f6e2d617574686f72697a6174696f6e007631007b22616374696f6e4964223a226163745f766563746f725f303031222c226361706162696c697479223a22776f726b666c6f772e65786563757465222c226465766963654964223a226465765f766563746f725f303031222c22657870697265734174223a22323032362d31302d30365432333a30353a30302e3030305a222c226964656d706f74656e63794b6579223a226964656d5f766563746f725f30303031222c226973737565644174223a22323032362d31302d30365432333a30303a30302e3030305a222c226e6f6e6365223a2241414141414141414141414141414141414141414141414141414141414141414141414141414141414141222c227269736b223a224b32222c2273636f70654964223a2273636f70655f766563746f725f303031222c2276657273696f6e223a226b796e7472616c2e616374696f6e2e7631222c22776f726b666c6f774964223a2277665f6d656469615f696e74616b65227d",
+  "actionAuthorizationSignatureDerBase64Url": "MEUCIC2EfgP2sOmDKvZ0btRTQI1z7K3oDkom8Ci104W6oTFzAiEA-edHQ3uQngkSHlRhCVIw4vT64-b8hssmZhXNbU9UI20",
+  "authorizationPublicKeyJwk": {
+    "kty": "EC",
+    "crv": "P-256",
+    "x": "axfR8uEsQkf4vOblY6RA8ncDfYEt6zOg9KE5RdiYwpY",
+    "y": "T-NC4v4af5uO5-tKfA-eFivOM1drMV7Oy7ZAaDe_UfU",
+    "kid": "auth-test-01",
+    "use": "sig",
+    "alg": "ES256"
+  },
+  "signedAction": {
+    "version": "kyntral.action.v1",
+    "actionId": "act_vector_001",
+    "deviceId": "dev_vector_001",
+    "scopeId": "scope_vector_001",
+    "workflowId": "wf_media_intake",
+    "capability": "workflow.execute",
+    "risk": "K2",
+    "nonce": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+    "issuedAt": "2026-10-06T23:00:00.000Z",
+    "expiresAt": "2026-10-06T23:05:00.000Z",
+    "idempotencyKey": "idem_vector_0001",
+    "authorizationProof": {
+      "keyId": "auth-test-01",
+      "algorithm": "ES256",
+      "signature": "MEUCIC2EfgP2sOmDKvZ0btRTQI1z7K3oDkom8Ci104W6oTFzAiEA-edHQ3uQngkSHlRhCVIw4vT64-b8hssmZhXNbU9UI20"
+    }
+  },
+  "actionHash": "sha256:47a0b0c5f209dc6ccbab0f35588fe458c7b67b61b6f107b7785b93abc99c10de",
+  "canonicalReceiptUnsigned": "{\"actionHash\":\"sha256:47a0b0c5f209dc6ccbab0f35588fe458c7b67b61b6f107b7785b93abc99c10de\",\"actionId\":\"act_vector_001\",\"completedAt\":\"2026-10-06T23:00:12.000Z\",\"counts\":{\"completed\":1,\"failed\":0},\"deviceId\":\"dev_vector_001\",\"outcome\":\"completed\",\"receiptId\":\"rcpt_vector_001\",\"startedAt\":\"2026-10-06T23:00:10.000Z\",\"version\":\"kyntral.receipt.v1\"}",
+  "receiptPreimageHex": "4b594e5452414c00657865637574696f6e2d72656365697074007631007b22616374696f6e48617368223a227368613235363a34376130623063356632303964633663636261623066333535383866653435386337623637623631623666313037623737383562393361626339396331306465222c22616374696f6e4964223a226163745f766563746f725f303031222c22636f6d706c657465644174223a22323032362d31302d30365432333a30303a31322e3030305a222c22636f756e7473223a7b22636f6d706c65746564223a312c226661696c6564223a307d2c226465766963654964223a226465765f766563746f725f303031222c226f7574636f6d65223a22636f6d706c65746564222c22726563656970744964223a22726370745f766563746f725f303031222c22737461727465644174223a22323032362d31302d30365432333a30303a31302e3030305a222c2276657273696f6e223a226b796e7472616c2e726563656970742e7631227d",
+  "receiptSignatureDerBase64Url": "MEQCIAze2bMUkXOJQzGr3cjryDbXlNChC9q5xWIobLX8jjsHAiBtIhbrlG_d1IY1_QiQvN79hpAJQdTJIHu9LYbUbVRBPw",
+  "deviceSigningPublicKeyJwk": {
+    "kty": "EC",
+    "crv": "P-256",
+    "x": "fPJ7GI0DT36KUjgDBLUaw8CJaeJ38hs1pgtI_EdmmXg",
+    "y": "B3dVENuO0EApPZrGn3Qw27p9reY86YIpngS3nSJ4c9E",
+    "kid": "device-sign-test-01",
+    "use": "sig",
+    "alg": "ES256"
+  },
+  "signedReceipt": {
+    "version": "kyntral.receipt.v1",
+    "receiptId": "rcpt_vector_001",
+    "actionId": "act_vector_001",
+    "deviceId": "dev_vector_001",
+    "actionHash": "sha256:47a0b0c5f209dc6ccbab0f35588fe458c7b67b61b6f107b7785b93abc99c10de",
+    "outcome": "completed",
+    "startedAt": "2026-10-06T23:00:10.000Z",
+    "completedAt": "2026-10-06T23:00:12.000Z",
+    "counts": {
+      "completed": 1,
+      "failed": 0
+    },
+    "deviceProof": {
+      "keyId": "device-sign-test-01",
+      "algorithm": "ES256",
+      "signature": "MEQCIAze2bMUkXOJQzGr3cjryDbXlNChC9q5xWIobLX8jjsHAiBtIhbrlG_d1IY1_QiQvN79hpAJQdTJIHu9LYbUbVRBPw"
+    }
+  },
+  "deviceKeyAgreementPublicKeyJwk": {
+    "kty": "EC",
+    "crv": "P-256",
+    "x": "Xsvk0aYzCkTI9--VHUvxZebGtyHvramF-0FmG8bn_Ww",
+    "y": "hzRkDEmY_343SwbOGmSi7NgqsDY4T7g9mnmxJ6J9UDI",
+    "kid": "device-kex-test-01",
+    "use": "enc",
+    "alg": "ECDH-ES"
+  },
+  "serverKeyAgreementPublicKeyJwk": {
+    "kty": "EC",
+    "crv": "P-256",
+    "x": "4lNKNTLQj7ugLd5lnuYr0AMf4tt4VZbvUJMCRGsDCFI",
+    "y": "4PFXWkxjPMcZ3-5f2oYtdk78lsPzDuAFXELCPxhO2MY",
+    "kid": "server-kex-test-01",
+    "use": "enc",
+    "alg": "ECDH-ES"
+  },
+  "ecdhSharedSecretBase64Url": "dB3VvagX2V5GJlNzIOXVUXmYMCiy-CyZ1QDF7oYk48Q"
+}

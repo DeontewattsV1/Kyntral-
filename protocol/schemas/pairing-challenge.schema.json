@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kyntral.invalid/schema/pairing-challenge.v1.json",
+  "$comment": "SPDX-License-Identifier: Apache-2.0",
+  "title": "Kyntral PairingChallenge v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "challengeId", "principalId", "nonce", "issuedAt", "expiresAt"],
+  "properties": {
+    "version": { "const": "kyntral.pairing-challenge.v1" },
+    "challengeId": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]{2,127}$" },
+    "principalId": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]{2,127}$" },
+    "nonce": { "type": "string", "pattern": "^[A-Za-z0-9_-]{43}$" },
+    "issuedAt": { "type": "string", "format": "date-time" },
+    "expiresAt": { "type": "string", "format": "date-time" }
+  }
+}

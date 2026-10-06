@@ -5,18 +5,41 @@
   "title": "Kyntral ActionEnvelope v1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["version", "actionId", "scopeId", "deviceId", "workflowId", "capability", "risk", "nonce", "issuedAt", "expiresAt", "idempotencyKey"],
+  "required": [
+    "version",
+    "actionId",
+    "scopeId",
+    "deviceId",
+    "workflowId",
+    "capability",
+    "risk",
+    "nonce",
+    "issuedAt",
+    "expiresAt",
+    "idempotencyKey",
+    "authorizationProof"
+  ],
   "properties": {
     "version": { "const": "kyntral.action.v1" },
-    "actionId": { "type": "string" },
-    "scopeId": { "type": "string" },
-    "deviceId": { "type": "string" },
-    "workflowId": { "type": "string" },
-    "capability": { "type": "string" },
+    "actionId": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]{2,127}$" },
+    "scopeId": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]{2,127}$" },
+    "deviceId": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]{2,127}$" },
+    "workflowId": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]{2,127}$" },
+    "capability": { "type": "string", "minLength": 3, "maxLength": 128 },
     "risk": { "enum": ["K0", "K1", "K2", "K3", "K4"] },
-    "nonce": { "type": "string", "minLength": 16 },
+    "nonce": { "type": "string", "pattern": "^[A-Za-z0-9_-]{43}$" },
     "issuedAt": { "type": "string", "format": "date-time" },
     "expiresAt": { "type": "string", "format": "date-time" },
-    "idempotencyKey": { "type": "string", "minLength": 16 }
+    "idempotencyKey": { "type": "string", "minLength": 16, "maxLength": 128 },
+    "authorizationProof": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["keyId", "algorithm", "signature"],
+      "properties": {
+        "keyId": { "type": "string", "minLength": 3, "maxLength": 128 },
+        "algorithm": { "const": "ES256" },
+        "signature": { "type": "string", "pattern": "^[A-Za-z0-9_-]+$" }
+      }
+    }
   }
 }

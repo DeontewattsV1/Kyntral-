@@ -5,12 +5,24 @@
   "title": "Kyntral ExecutionReceipt v1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["version", "receiptId", "actionId", "deviceId", "outcome", "startedAt", "completedAt", "counts", "receiptHash", "deviceSignature"],
+  "required": [
+    "version",
+    "receiptId",
+    "actionId",
+    "deviceId",
+    "actionHash",
+    "outcome",
+    "startedAt",
+    "completedAt",
+    "counts",
+    "deviceProof"
+  ],
   "properties": {
     "version": { "const": "kyntral.receipt.v1" },
-    "receiptId": { "type": "string" },
-    "actionId": { "type": "string" },
-    "deviceId": { "type": "string" },
+    "receiptId": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]{2,127}$" },
+    "actionId": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]{2,127}$" },
+    "deviceId": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]{2,127}$" },
+    "actionHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
     "outcome": { "enum": ["completed", "partial", "failed", "cancelled"] },
     "startedAt": { "type": "string", "format": "date-time" },
     "completedAt": { "type": "string", "format": "date-time" },
@@ -23,7 +35,15 @@
         "failed": { "type": "integer", "minimum": 0 }
       }
     },
-    "receiptHash": { "type": "string" },
-    "deviceSignature": { "type": "string" }
+    "deviceProof": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["keyId", "algorithm", "signature"],
+      "properties": {
+        "keyId": { "type": "string", "minLength": 3, "maxLength": 128 },
+        "algorithm": { "const": "ES256" },
+        "signature": { "type": "string", "pattern": "^[A-Za-z0-9_-]+$" }
+      }
+    }
   }
 }
