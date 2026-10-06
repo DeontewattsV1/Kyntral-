@@ -3,6 +3,10 @@
 import { mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import type {
+  AuthorizationQuery,
+  CapabilityGrantRecord
+} from "./authorization.js";
 import { assertNoPrivatePayload, type CloudJob, type CloudReceipt } from "./domain.js";
 
 export type StoredPairingChallenge = Readonly<{
@@ -35,6 +39,9 @@ export interface KyntralStore {
   putDevice(device: StoredDevice): void;
   getDevice(deviceId: string): StoredDevice | null;
   revokeDevice(deviceId: string, revokedAt?: Date): boolean;
+  putCapabilityGrant(grant: CapabilityGrantRecord): void;
+  findCapabilityGrant(query: AuthorizationQuery): CapabilityGrantRecord | null;
+  revokeCapabilityGrant(grantId: string, revokedAt?: Date): boolean;
 }
 
 type Row = Record<string, string | number | bigint | null>;
@@ -46,7 +53,9 @@ const SCHEMA = [
   "CREATE TABLE IF NOT EXISTS receipts (action_id TEXT PRIMARY KEY, receipt_id TEXT NOT NULL UNIQUE, device_id TEXT NOT NULL, action_hash TEXT NOT NULL, state TEXT NOT NULL, completed INTEGER NOT NULL, failed INTEGER NOT NULL, completed_at TEXT NOT NULL, device_key_id TEXT NOT NULL, device_signature TEXT NOT NULL);",
   "CREATE TABLE IF NOT EXISTS consumed_nonces (namespace TEXT NOT NULL, nonce TEXT NOT NULL, expires_at TEXT NOT NULL, consumed_at TEXT NOT NULL, PRIMARY KEY (namespace, nonce));",
   "CREATE TABLE IF NOT EXISTS pairing_challenges (challenge_id TEXT PRIMARY KEY, principal_id TEXT NOT NULL, nonce TEXT NOT NULL, issued_at TEXT NOT NULL, expires_at TEXT NOT NULL, consumed_at TEXT);",
-  "CREATE TABLE IF NOT EXISTS devices (device_id TEXT PRIMARY KEY, principal_id TEXT NOT NULL, identity_json TEXT NOT NULL, created_at TEXT NOT NULL, revoked_at TEXT);"
+  "CREATE TABLE IF NOT EXISTS devices (device_id TEXT PRIMARY KEY, principal_id TEXT NOT NULL, identity_json TEXT NOT NULL, created_at TEXT NOT NULL, revoked_at TEXT);",
+  "CREATE TABLE IF NOT EXISTS capability_grants (grant_id TEXT PRIMARY KEY, principal_id TEXT NOT NULL, device_id TEXT NOT NULL, scope_id TEXT NOT NULL, workflow_id TEXT NOT NULL, capability TEXT NOT NULL, risk TEXT NOT NULL, status TEXT NOT NULL, issued_at TEXT NOT NULL, expires_at TEXT, revoked_at TEXT);",
+  "CREATE INDEX IF NOT EXISTS idx_grants_lookup ON capability_grants (principal_id, device_id, scope_id, workflow_id, capability, risk);"
 ].join("\n");
 
 export class SqliteKyntralStore implements KyntralStore {
@@ -199,6 +208,48 @@ export class SqliteKyntralStore implements KyntralStore {
     const result = this.#db.prepare(
       "UPDATE devices SET revoked_at = ? WHERE device_id = ? AND revoked_at IS NULL"
     ).run(revokedAt.toISOString(), deviceId);
+    return Number(result.changes) === 1;
+  }
+
+  putCapabilityGrant(grant: CapabilityGrantRecord): void {
+    assertNoPrivatePayload(grant);
+    this.#db.prepare(
+      "INSERT INTO capability_grants (grant_id, principal_id, device_id, scope_id, workflow_id, capability, risk, status, issued_at, expires_at, revoked_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(grant_id) DO UPDATE SET status = excluded.status, expires_at = excluded.expires_at, revoked_at = excluded.revoked_at"
+    ).run(
+      grant.grantId, grant.principalId, grant.deviceId, grant.scopeId,
+      grant.workflowId, grant.capability, grant.risk, grant.status,
+      grant.issuedAt, grant.expiresAt, grant.revokedAt
+    );
+  }
+
+  findCapabilityGrant(query: AuthorizationQuery): CapabilityGrantRecord | null {
+    const row = this.#db.prepare(
+      "SELECT grant_id, principal_id, device_id, scope_id, workflow_id, capability, risk, status, issued_at, expires_at, revoked_at FROM capability_grants WHERE principal_id = ? AND device_id = ? AND scope_id = ? AND workflow_id = ? AND capability = ? AND risk = ? ORDER BY issued_at DESC LIMIT 1"
+    ).get(
+      query.principalId, query.deviceId, query.scopeId,
+      query.workflowId, query.capability, query.risk
+    ) as Row | undefined;
+
+    if (!row) return null;
+    return {
+      grantId: String(row.grant_id),
+      principalId: String(row.principal_id),
+      deviceId: String(row.device_id),
+      scopeId: String(row.scope_id),
+      workflowId: String(row.workflow_id),
+      capability: String(row.capability),
+      risk: String(row.risk) as CapabilityGrantRecord["risk"],
+      status: String(row.status) as CapabilityGrantRecord["status"],
+      issuedAt: String(row.issued_at),
+      expiresAt: row.expires_at === null ? null : String(row.expires_at),
+      revokedAt: row.revoked_at === null ? null : String(row.revoked_at)
+    };
+  }
+
+  revokeCapabilityGrant(grantId: string, revokedAt = new Date()): boolean {
+    const result = this.#db.prepare(
+      "UPDATE capability_grants SET status = 'Revoked', revoked_at = ? WHERE grant_id = ? AND revoked_at IS NULL"
+    ).run(revokedAt.toISOString(), grantId);
     return Number(result.changes) === 1;
   }
 }

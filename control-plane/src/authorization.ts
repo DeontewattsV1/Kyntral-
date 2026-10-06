@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 
 import type { RiskClass } from "./domain.js";
+import type { KyntralStore } from "./store.js";
 
 export type AuthorizationDecision =
   | "Allowed"
@@ -10,6 +11,7 @@ export type AuthorizationDecision =
   | "Revoked";
 
 export type AuthorizationQuery = Readonly<{
+  principalId: string;
   deviceId: string;
   scopeId: string;
   workflowId: string;
@@ -17,19 +19,53 @@ export type AuthorizationQuery = Readonly<{
   risk: RiskClass;
 }>;
 
+export type CapabilityGrantRecord = Readonly<{
+  grantId: string;
+  principalId: string;
+  deviceId: string;
+  scopeId: string;
+  workflowId: string;
+  capability: string;
+  risk: RiskClass;
+  status: "Allowed" | "Denied" | "Revoked";
+  issuedAt: string;
+  expiresAt: string | null;
+  revokedAt: string | null;
+}>;
+
 export interface AuthorizationStore {
-  evaluate(query: AuthorizationQuery): Promise<AuthorizationDecision>;
+  evaluate(query: AuthorizationQuery, now?: Date): Promise<AuthorizationDecision>;
 }
 
-/**
- * Safe default for the public scaffold.
- *
- * A missing identity/policy backend must never silently become authorization.
- * Production deployments replace this store with an authenticated policy store.
- */
 export class DenyByDefaultAuthorizationStore implements AuthorizationStore {
-  async evaluate(_query: AuthorizationQuery): Promise<AuthorizationDecision> {
+  async evaluate(
+    _query: AuthorizationQuery,
+    _now = new Date()
+  ): Promise<AuthorizationDecision> {
     return "Unknown";
+  }
+}
+
+export class PersistentAuthorizationStore implements AuthorizationStore {
+  constructor(private readonly store: KyntralStore) {}
+
+  async evaluate(
+    query: AuthorizationQuery,
+    now = new Date()
+  ): Promise<AuthorizationDecision> {
+    const device = this.store.getDevice(query.deviceId);
+    if (!device) return "Unknown";
+    if (device.revokedAt !== null) return "Revoked";
+    if (device.principalId !== query.principalId) return "Denied";
+
+    const grant = this.store.findCapabilityGrant(query);
+    if (!grant) return "Unknown";
+    if (grant.revokedAt !== null || grant.status === "Revoked") return "Revoked";
+    if (grant.status === "Denied") return "Denied";
+    if (grant.expiresAt !== null && Date.parse(grant.expiresAt) < now.getTime()) {
+      return "Expired";
+    }
+    return grant.status === "Allowed" ? "Allowed" : "Unknown";
   }
 }
 
@@ -37,6 +73,6 @@ export function requireAllowed(
   decision: AuthorizationDecision
 ): asserts decision is "Allowed" {
   if (decision !== "Allowed") {
-    throw new Error(`Execution denied: authorization decision is ${decision}`);
+    throw new Error("Execution denied: authorization decision is " + decision);
   }
 }
