@@ -2,7 +2,6 @@
 
 import { randomUUID } from "node:crypto";
 import {
-  createMcpHandler,
   McpServer,
   requireScopes,
   type AuthInfo
@@ -24,7 +23,6 @@ import {
   type PairingProof
 } from "./pairing.js";
 import {
-  SqliteKyntralStore,
   type KyntralStore
 } from "./store.js";
 
@@ -36,13 +34,9 @@ export const KYNTRAL_SCOPES = {
 } as const;
 
 type KyntralServerOptions = Readonly<{
-  store?: KyntralStore;
+  store: KyntralStore;
   authorizationStore?: AuthorizationStore;
 }>;
-
-const productionStore = new SqliteKyntralStore(
-  process.env.KYNTRAL_DB_PATH ?? "./data/kyntral.db"
-);
 
 function textResult(value: unknown) {
   assertNoPrivatePayload(value);
@@ -90,7 +84,7 @@ function assertOwnsDevice(
 export function createKyntralServer(
   options: KyntralServerOptions = {}
 ): McpServer {
-  const store = options.store ?? productionStore;
+  const store = options.store;
   const authorizationStore =
     options.authorizationStore ?? new PersistentAuthorizationStore(store);
 
@@ -487,9 +481,3 @@ export function createKyntralServer(
   return server;
 }
 
-export const handler = createMcpHandler((ctx) =>
-  createKyntralServer({
-    store: productionStore
-  })
-);
-export default handler;
