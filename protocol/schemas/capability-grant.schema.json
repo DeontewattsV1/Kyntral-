@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kyntral.invalid/schema/capability-grant.v1.json",
+  "$comment": "SPDX-License-Identifier: Apache-2.0",
+  "title": "Kyntral CapabilityGrant v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "grantId",
+    "deviceId",
+    "scopeId",
+    "workflowId",
+    "capability",
+    "risk",
+    "status",
+    "issuedAt"
+  ],
+  "properties": {
+    "version": { "const": "kyntral.grant.v1" },
+    "grantId": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]{2,127}$" },
+    "deviceId": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]{2,127}$" },
+    "scopeId": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]{2,127}$" },
+    "workflowId": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]{2,127}$" },
+    "capability": { "type": "string", "minLength": 3, "maxLength": 128 },
+    "risk": { "enum": ["K0", "K1", "K2", "K3", "K4"] },
+    "status": { "enum": ["Allowed", "Denied", "Revoked"] },
+    "issuedAt": { "type": "string", "format": "date-time" },
+    "expiresAt": { "type": "string", "format": "date-time" },
+    "constraints": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "backgroundAllowed": { "type": "boolean" },
+        "maxExecutions": { "type": "integer", "minimum": 1 },
+        "destinationId": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_-]{2,127}$"
+        }
+      }
+    }
+  }
+}

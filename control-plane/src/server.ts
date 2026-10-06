@@ -3,9 +3,24 @@
 import { randomUUID } from "node:crypto";
 import { createMcpHandler, McpServer } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
-import { assertNoPrivatePayload, createCloudJob, type CloudJob } from "./domain.js";
+import {
+  DenyByDefaultAuthorizationStore,
+  requireAllowed,
+  type AuthorizationStore
+} from "./authorization.js";
+import {
+  assertNoPrivatePayload,
+  assertOpaqueId,
+  createCloudJob,
+  type CloudJob,
+  type CloudReceipt
+} from "./domain.js";
 
-const jobs = new Map<string, CloudJob>();
+type KyntralServerOptions = Readonly<{
+  authorizationStore?: AuthorizationStore;
+  jobs?: Map<string, CloudJob>;
+  receipts?: Map<string, CloudReceipt>;
+}>;
 
 function textResult(value: unknown) {
   assertNoPrivatePayload(value);
@@ -15,7 +30,18 @@ function textResult(value: unknown) {
   };
 }
 
-export function createKyntralServer(): McpServer {
+function opaque(value: string, field: string): string {
+  return assertOpaqueId(value, field);
+}
+
+export function createKyntralServer(
+  options: KyntralServerOptions = {}
+): McpServer {
+  const authorizationStore =
+    options.authorizationStore ?? new DenyByDefaultAuthorizationStore();
+  const jobs = options.jobs ?? new Map<string, CloudJob>();
+  const receipts = options.receipts ?? new Map<string, CloudReceipt>();
+
   const server = new McpServer(
     { name: "kyntral", version: "0.1.0-prealpha" },
     { capabilities: { tools: {} } }
@@ -24,26 +50,45 @@ export function createKyntralServer(): McpServer {
   server.registerTool(
     "kyntral_get_device",
     {
-      description: "Read connection status for an already-authorized opaque Kyntral device identifier.",
-      inputSchema: z.object({ deviceId: z.string().min(3).max(128) })
+      title: "Get Kyntral device state",
+      description:
+        "Read the minimal state for an opaque Kyntral device identifier. " +
+        "The public scaffold never assumes an unknown device is paired.",
+      inputSchema: z.object({ deviceId: z.string().min(3).max(128) }),
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false
+      }
     },
     async ({ deviceId }) => textResult({
-      deviceId,
-      paired: true,
-      revoked: false,
-      executionAuthority: "device"
+      deviceId: opaque(deviceId, "deviceId"),
+      state: "unknown",
+      executionAuthority: "device",
+      contentLocation: "device"
     })
   );
 
   server.registerTool(
     "kyntral_list_capabilities",
     {
-      description: "List capability identifiers and risk classes available to an authorized Kyntral scope.",
-      inputSchema: z.object({ scopeId: z.string().min(3).max(128) })
+      title: "List Kyntral capabilities",
+      description:
+        "List capability identifiers supported by this server. " +
+        "Supported does not mean granted; grants are evaluated separately.",
+      inputSchema: z.object({ scopeId: z.string().min(3).max(128) }),
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false
+      }
     },
     async ({ scopeId }) => textResult({
-      scopeId,
-      capabilities: [
+      scopeId: opaque(scopeId, "scopeId"),
+      grantState: "Unknown",
+      supportedCapabilities: [
         { id: "workflow.preview", risk: "K0" },
         { id: "workflow.execute", risk: "K2" },
         { id: "receipt.read", risk: "K0" }
@@ -54,43 +99,81 @@ export function createKyntralServer(): McpServer {
   server.registerTool(
     "kyntral_preview_workflow",
     {
-      description: "Preview authorization metadata for an opaque local workflow. This tool does not request workflow payloads.",
+      title: "Preview Kyntral workflow authorization",
+      description:
+        "Evaluate authorization metadata for an opaque local workflow. " +
+        "The tool never requests the workflow's private payload.",
       inputSchema: z.object({
         deviceId: z.string().min(3).max(128),
         scopeId: z.string().min(3).max(128),
         workflowId: z.string().min(3).max(128)
-      })
+      }),
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false
+      }
     },
-    async ({ deviceId, scopeId, workflowId }) => textResult({
-      deviceId,
-      scopeId,
-      workflowId,
-      authorized: true,
-      risk: "K2",
-      contentLocation: "device",
-      payloadRequestedByCloud: false
-    })
+    async ({ deviceId, scopeId, workflowId }) => {
+      const query = {
+        deviceId: opaque(deviceId, "deviceId"),
+        scopeId: opaque(scopeId, "scopeId"),
+        workflowId: opaque(workflowId, "workflowId"),
+        capability: "workflow.execute",
+        risk: "K2" as const
+      };
+      const decision = await authorizationStore.evaluate(query);
+
+      return textResult({
+        ...query,
+        decision,
+        authorized: decision === "Allowed",
+        contentLocation: "device",
+        payloadRequestedByCloud: false
+      });
+    }
   );
 
   server.registerTool(
     "kyntral_queue_workflow",
     {
-      description: "Queue a specific opaque workflow on a paired device. The request contains no private workflow payload.",
+      title: "Queue authorized Kyntral workflow",
+      description:
+        "Queue one specific opaque workflow on a paired device after " +
+        "authorization has been explicitly evaluated as Allowed. " +
+        "No private workflow payload is accepted.",
       inputSchema: z.object({
         deviceId: z.string().min(3).max(128),
         scopeId: z.string().min(3).max(128),
         workflowId: z.string().min(3).max(128)
-      })
+      }),
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true
+      }
     },
     async ({ deviceId, scopeId, workflowId }) => {
+      const query = {
+        deviceId: opaque(deviceId, "deviceId"),
+        scopeId: opaque(scopeId, "scopeId"),
+        workflowId: opaque(workflowId, "workflowId"),
+        capability: "workflow.execute",
+        risk: "K2" as const
+      };
+      const decision = await authorizationStore.evaluate(query);
+      requireAllowed(decision);
+
       const actionId = `act_${randomUUID().replaceAll("-", "")}`;
       const job = createCloudJob({
         actionId,
-        deviceId,
-        scopeId,
-        workflowId,
-        capability: "workflow.execute",
-        risk: "K2",
+        deviceId: query.deviceId,
+        scopeId: query.scopeId,
+        workflowId: query.workflowId,
+        capability: query.capability,
+        risk: query.risk,
         expiresAt: new Date(Date.now() + 5 * 60_000).toISOString()
       });
       jobs.set(actionId, job);
@@ -101,11 +184,19 @@ export function createKyntralServer(): McpServer {
   server.registerTool(
     "kyntral_get_job",
     {
-      description: "Read the minimal state of a previously queued Kyntral action.",
-      inputSchema: z.object({ actionId: z.string().min(3).max(128) })
+      title: "Get Kyntral job",
+      description: "Read the minimal content-free state of a queued Kyntral action.",
+      inputSchema: z.object({ actionId: z.string().min(3).max(128) }),
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false
+      }
     },
     async ({ actionId }) => {
-      const job = jobs.get(actionId);
+      const id = opaque(actionId, "actionId");
+      const job = jobs.get(id);
       if (!job) throw new Error("Unknown actionId");
       return textResult(job);
     }
@@ -114,14 +205,22 @@ export function createKyntralServer(): McpServer {
   server.registerTool(
     "kyntral_cancel_job",
     {
-      description: "Cancel a queued Kyntral action by opaque action identifier.",
-      inputSchema: z.object({ actionId: z.string().min(3).max(128) })
+      title: "Cancel Kyntral job",
+      description: "Cancel a known queued Kyntral action by opaque action identifier.",
+      inputSchema: z.object({ actionId: z.string().min(3).max(128) }),
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false
+      }
     },
     async ({ actionId }) => {
-      const job = jobs.get(actionId);
+      const id = opaque(actionId, "actionId");
+      const job = jobs.get(id);
       if (!job) throw new Error("Unknown actionId");
       const cancelled = Object.freeze({ ...job, state: "cancelled" as const });
-      jobs.set(actionId, cancelled);
+      jobs.set(id, cancelled);
       return textResult(cancelled);
     }
   );
@@ -129,17 +228,24 @@ export function createKyntralServer(): McpServer {
   server.registerTool(
     "kyntral_get_receipt",
     {
-      description: "Read a content-free execution receipt summary for a completed action.",
-      inputSchema: z.object({ actionId: z.string().min(3).max(128) })
+      title: "Get Kyntral execution receipt",
+      description:
+        "Read a content-free receipt that was actually submitted for a known action. " +
+        "The scaffold never fabricates completed receipts.",
+      inputSchema: z.object({ actionId: z.string().min(3).max(128) }),
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false
+      }
     },
-    async ({ actionId }) => textResult({
-      actionId,
-      state: "completed",
-      completed: 1,
-      failed: 0,
-      receiptHash: "sha256:pending-device-implementation",
-      deviceSignature: "pending-device-implementation"
-    })
+    async ({ actionId }) => {
+      const id = opaque(actionId, "actionId");
+      const receipt = receipts.get(id);
+      if (!receipt) throw new Error("Receipt not available");
+      return textResult(receipt);
+    }
   );
 
   return server;
