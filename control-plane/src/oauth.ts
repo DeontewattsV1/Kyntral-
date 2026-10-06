@@ -144,11 +144,7 @@ export class IntrospectionTokenVerifier implements OAuthTokenVerifier {
       invalidToken("access token audience mismatch");
     }
 
-    return {
-      token,
-      clientId: result.client_id,
-      scopes: normalizeScopes(result.scope),
-      expiresAt: result.exp,
+    const expiresAt = result.exp as number;\n\n    return {\n      token,\n      clientId: result.client_id,\n      scopes: normalizeScopes(result.scope),\n      expiresAt,
       resource: new URL(this.options.expectedResource),
       extra: {
         kyntralPrincipalId: deriveOpaquePrincipalId(
