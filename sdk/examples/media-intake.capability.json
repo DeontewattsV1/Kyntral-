@@ -1,0 +1,23 @@
+{
+  "version": "kyntral.capability.v1",
+  "id": "org.kyntral.media-intake",
+  "moduleVersion": "0.1.0",
+  "publisher": {
+    "id": "kyntral_core",
+    "name": "Kyntral",
+    "repository": "https://github.com/DeontewattsV1/Kyntral-"
+  },
+  "risk": "K2",
+  "execution": {
+    "location": "device",
+    "backgroundAllowed": true
+  },
+  "deviceData": ["notes", "files"],
+  "network": {
+    "access": "allowlist",
+    "domains": ["api.example.invalid"]
+  },
+  "sideEffects": ["local-read", "network-read", "local-write"],
+  "destinations": ["dest_media_archive"],
+  "minimumKyntralVersion": "0.1.0"
+}

@@ -3,17 +3,129 @@
   "$id": "https://kyntral.invalid/schema/capability-manifest.v1.json",
   "$comment": "SPDX-License-Identifier: Apache-2.0",
   "title": "Kyntral CapabilityManifest v1",
+  "description": "Frozen declaration format for Kyntral-compatible capability modules. A manifest declares what a module may require; it never grants runtime authority.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["version", "id", "publisher", "risk", "execution", "network", "deviceData"],
+  "required": [
+    "version",
+    "id",
+    "moduleVersion",
+    "publisher",
+    "risk",
+    "execution",
+    "deviceData",
+    "network",
+    "sideEffects"
+  ],
   "properties": {
     "version": { "const": "kyntral.capability.v1" },
-    "id": { "type": "string" },
-    "publisher": { "type": "string" },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)+$",
+      "maxLength": 160
+    },
+    "moduleVersion": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?$"
+    },
+    "publisher": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_-]{2,127}$"
+        },
+        "name": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "repository": { "type": "string", "format": "uri" }
+      }
+    },
     "risk": { "enum": ["K0", "K1", "K2", "K3", "K4"] },
-    "execution": { "enum": ["device", "cloud", "hybrid"] },
-    "network": { "type": "boolean" },
-    "networkDomains": { "type": "array", "uniqueItems": true, "items": { "type": "string" } },
-    "deviceData": { "type": "array", "uniqueItems": true, "items": { "type": "string" } }
+    "execution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["location", "backgroundAllowed"],
+      "properties": {
+        "location": { "enum": ["device", "cloud", "hybrid"] },
+        "backgroundAllowed": { "type": "boolean" }
+      }
+    },
+    "deviceData": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "none",
+          "notes",
+          "files",
+          "photos",
+          "clipboard",
+          "contacts",
+          "calendar",
+          "location",
+          "health",
+          "microphone",
+          "camera"
+        ]
+      }
+    },
+    "network": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["access"],
+      "properties": {
+        "access": { "enum": ["none", "allowlist"] },
+        "domains": {
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 50,
+          "items": {
+            "type": "string",
+            "pattern": "^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,63}$"
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "access": { "const": "none" } } },
+          "then": { "properties": { "domains": { "maxItems": 0 } } }
+        },
+        {
+          "if": { "properties": { "access": { "const": "allowlist" } } },
+          "then": { "required": ["domains"], "properties": { "domains": { "minItems": 1 } } }
+        }
+      ]
+    },
+    "sideEffects": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "none",
+          "local-read",
+          "local-write",
+          "network-read",
+          "network-write",
+          "external-write",
+          "delete",
+          "financial",
+          "communication"
+        ]
+      }
+    },
+    "destinations": {
+      "type": "array",
+      "uniqueItems": true,
+      "maxItems": 25,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9_-]{2,127}$"
+      }
+    },
+    "minimumKyntralVersion": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?$"
+    }
   }
 }
