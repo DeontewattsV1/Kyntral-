@@ -251,5 +251,5 @@ export function createKyntralServer(
   return server;
 }
 
-export const handler = createMcpHandler(createKyntralServer);
+export const handler = createMcpHandler(() => createKyntralServer());
 export default handler;
