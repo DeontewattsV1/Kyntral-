@@ -11,6 +11,11 @@ import {
   type P256PrivateJwk
 } from "./action.js";
 import type { ExecutionReceipt } from "./crypto.js";
+import {
+  DEVICE_REQUEST_PROOF_HEADER,
+  decodeDeviceRequestHeader,
+  verifyAndConsumeDeviceRequest
+} from "./device-request.js";
 import { assertOpaqueId } from "./domain.js";
 import { IntrospectionTokenVerifier } from "./oauth.js";
 import {
@@ -85,17 +90,44 @@ function requireHttpScope(
   );
 }
 
-async function readBoundedJson<T>(request: Request): Promise<T> {
+async function readBoundedBody(request: Request): Promise<Uint8Array> {
   const contentLength = Number(request.headers.get("content-length") ?? "0");
   if (Number.isFinite(contentLength) && contentLength > MAX_DEVICE_REQUEST_BYTES) {
     throw new Error("request too large");
   }
 
-  const text = await request.text();
-  if (new TextEncoder().encode(text).byteLength > MAX_DEVICE_REQUEST_BYTES) {
+  const bytes = new Uint8Array(await request.arrayBuffer());
+  if (bytes.byteLength > MAX_DEVICE_REQUEST_BYTES) {
     throw new Error("request too large");
   }
-  return JSON.parse(text) as T;
+  return bytes;
+}
+
+async function readBoundedJson<T>(request: Request): Promise<T> {
+  const bytes = await readBoundedBody(request);
+  return JSON.parse(new TextDecoder().decode(bytes)) as T;
+}
+
+function verifyDevicePossession(input: {
+  request: Request;
+  store: KyntralStore;
+  deviceId: string;
+  method: "GET" | "POST";
+  path: string;
+  body: Uint8Array;
+  now: Date;
+}): void {
+  const header = input.request.headers.get(DEVICE_REQUEST_PROOF_HEADER);
+  if (!header) throw new Error("missing device request proof");
+  verifyAndConsumeDeviceRequest({
+    store: input.store,
+    proof: decodeDeviceRequestHeader(header),
+    expectedDeviceId: input.deviceId,
+    method: input.method,
+    path: input.path,
+    body: input.body,
+    now: input.now
+  });
 }
 
 function deviceIdFromPath(pathname: string): string | null {
@@ -336,6 +368,23 @@ export function createKyntralHttpHandler(config: KyntralHttpConfig) {
         return Response.json({ error: "device_revoked" }, { status: 403 });
       }
 
+      try {
+        verifyDevicePossession({
+          request,
+          store,
+          deviceId: actionDeviceId,
+          method: "GET",
+          path: url.pathname,
+          body: new Uint8Array(),
+          now: now()
+        });
+      } catch {
+        return Response.json(
+          { error: "invalid_device_request_proof" },
+          { status: 401 }
+        );
+      }
+
       const delivery = store.claimNextAction(actionDeviceId, now());
       if (!delivery) return new Response(null, { status: 204 });
 
@@ -370,7 +419,19 @@ export function createKyntralHttpHandler(config: KyntralHttpConfig) {
       }
 
       try {
-        const receipt = await readBoundedJson<ExecutionReceipt>(request);
+        const body = await readBoundedBody(request);
+        verifyDevicePossession({
+          request,
+          store,
+          deviceId: receiptDeviceId,
+          method: "POST",
+          path: url.pathname,
+          body,
+          now: now()
+        });
+        const receipt = JSON.parse(
+          new TextDecoder().decode(body)
+        ) as ExecutionReceipt;
         if (receipt.deviceId !== receiptDeviceId) {
           throw new Error("receipt device mismatch");
         }
