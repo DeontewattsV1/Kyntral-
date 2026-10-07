@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 
+import { readFileSync } from "node:fs";
 import {
   generateKeyPairSync,
   type JsonWebKey
@@ -9,6 +10,15 @@ import {
   Es256ActionSigner,
   type P256PrivateJwk
 } from "../src/action.js";
+import type {
+  ExecutionReceipt,
+  P256PublicJwk,
+  SignedActionEnvelope
+} from "../src/crypto.js";
+import { createCloudJob } from "../src/domain.js";
+import { deriveOpaquePrincipalId } from "../src/oauth.js";
+import { KYNTRAL_SCOPES } from "../src/server.js";
+import { SqliteKyntralStore } from "../src/store.js";
 import {
   createKyntralHttpHandler,
   loadHttpConfig,
@@ -17,6 +27,60 @@ import {
 
 const resource = new URL("https://api.example.test/mcp");
 const issuer = new URL("https://identity.example.test/");
+
+const vectors = JSON.parse(
+  readFileSync(
+    new URL("../../protocol/test-vectors/crypto-v1.json", import.meta.url),
+    "utf8"
+  )
+) as {
+  authorizationPublicKeyJwk: P256PublicJwk;
+  signedAction: SignedActionEnvelope;
+  actionHash: string;
+  deviceSigningPublicKeyJwk: P256PublicJwk;
+  deviceKeyAgreementPublicKeyJwk: P256PublicJwk;
+  signedReceipt: ExecutionReceipt;
+};
+
+function pairedStore(
+  revokedAt: string | null = null
+): SqliteKyntralStore {
+  const store = new SqliteKyntralStore(":memory:");
+  const principalId = deriveOpaquePrincipalId(
+    issuer,
+    "device-owner-123"
+  );
+  store.putDevice({
+    deviceId: vectors.signedAction.deviceId,
+    principalId,
+    identityJson: JSON.stringify({
+      version: "kyntral.device.v1",
+      deviceId: vectors.signedAction.deviceId,
+      platform: "ios",
+      signingPublicKey: vectors.deviceSigningPublicKeyJwk,
+      keyAgreementPublicKey: vectors.deviceKeyAgreementPublicKeyJwk,
+      createdAt: "2026-10-06T22:00:00.000Z"
+    }),
+    createdAt: "2026-10-06T22:00:00.000Z",
+    revokedAt
+  });
+  const action = vectors.signedAction;
+  const job = createCloudJob({
+    actionId: action.actionId,
+    deviceId: action.deviceId,
+    scopeId: action.scopeId,
+    workflowId: action.workflowId,
+    capability: action.capability,
+    risk: action.risk,
+    expiresAt: action.expiresAt
+  });
+  store.putAuthorizedJob(job, {
+    action,
+    authorizationKey: vectors.authorizationPublicKeyJwk,
+    actionHash: vectors.actionHash
+  }, new Date("2026-10-06T23:00:00.000Z"));
+  return store;
+}
 
 function signingJwk(kid = "auth_http_001"): P256PrivateJwk {
   const pair = generateKeyPairSync("ec", { namedCurve: "P-256" });
@@ -156,5 +220,164 @@ describe("OAuth-bound device HTTP surface", () => {
     await expect(response.json()).resolves.toEqual({
       error: "invalid_pairing_proof"
     });
+  });
+});
+
+
+describe("device action delivery HTTP surface", () => {
+  it("requires the dedicated device execution scope", async () => {
+    const store = pairedStore();
+    const handler = createKyntralHttpHandler({
+      ...configForScopes([KYNTRAL_SCOPES.read]),
+      store,
+      now: () => new Date("2026-10-06T23:01:00.000Z")
+    });
+
+    const response = await handler(request(
+      "/v1/devices/" + vectors.signedAction.deviceId + "/actions/next"
+    ));
+    expect(response.status).toBe(403);
+    expect(response.headers.get("www-authenticate"))
+      .toContain(KYNTRAL_SCOPES.deviceExecute);
+    store.close();
+  });
+
+  it("delivers only the exact device action and resumes the same in-flight action", async () => {
+    const store = pairedStore();
+    const handler = createKyntralHttpHandler({
+      ...configForScopes([KYNTRAL_SCOPES.deviceExecute]),
+      store,
+      now: () => new Date("2026-10-06T23:01:00.000Z")
+    });
+    const path =
+      "/v1/devices/" + vectors.signedAction.deviceId + "/actions/next";
+
+    const first = await handler(request(path));
+    expect(first.status).toBe(200);
+    const firstBody = await first.json() as {
+      action: SignedActionEnvelope;
+    };
+    expect(firstBody.action).toEqual(vectors.signedAction);
+    expect(store.getJob(vectors.signedAction.actionId)?.state)
+      .toBe("executing");
+
+    const resumed = await handler(request(path));
+    expect(resumed.status).toBe(200);
+    const resumedBody = await resumed.json() as {
+      action: SignedActionEnvelope;
+    };
+    expect(resumedBody.action.actionId)
+      .toBe(vectors.signedAction.actionId);
+    store.close();
+  });
+
+  it("does not deliver work to an unknown or revoked device", async () => {
+    const store = pairedStore();
+    const handler = createKyntralHttpHandler({
+      ...configForScopes([KYNTRAL_SCOPES.deviceExecute]),
+      store,
+      now: () => new Date("2026-10-06T23:01:00.000Z")
+    });
+    const unknown = await handler(request(
+      "/v1/devices/dev_unknown_001/actions/next"
+    ));
+    expect(unknown.status).toBe(404);
+    store.close();
+
+    const revoked = pairedStore("2026-10-06T23:00:30.000Z");
+    const revokedHandler = createKyntralHttpHandler({
+      ...configForScopes([KYNTRAL_SCOPES.deviceExecute]),
+      store: revoked,
+      now: () => new Date("2026-10-06T23:01:00.000Z")
+    });
+    const denied = await revokedHandler(request(
+      "/v1/devices/" + vectors.signedAction.deviceId + "/actions/next"
+    ));
+    expect(denied.status).toBe(403);
+    revoked.close();
+  });
+});
+
+describe("device receipt HTTP surface", () => {
+  it("requires receipt scope and finalizes only after exact verified receipt", async () => {
+    const deniedStore = pairedStore();
+    const deniedHandler = createKyntralHttpHandler({
+      ...configForScopes([KYNTRAL_SCOPES.deviceExecute]),
+      store: deniedStore,
+      now: () => new Date("2026-10-06T23:01:00.000Z")
+    });
+    const receiptPath =
+      "/v1/devices/" + vectors.signedAction.deviceId + "/receipts";
+    const denied = await deniedHandler(request(receiptPath, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(vectors.signedReceipt)
+    }));
+    expect(denied.status).toBe(403);
+    deniedStore.close();
+
+    const store = pairedStore();
+    const handler = createKyntralHttpHandler({
+      ...configForScopes([KYNTRAL_SCOPES.receiptSubmit]),
+      store,
+      now: () => new Date("2026-10-06T23:01:00.000Z")
+    });
+    const accepted = await handler(request(receiptPath, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(vectors.signedReceipt)
+    }));
+    expect(accepted.status).toBe(201);
+    const body = await accepted.json() as {
+      status: string;
+      verified: boolean;
+    };
+    expect(body).toMatchObject({
+      status: "accepted",
+      verified: true
+    });
+    expect(store.getJob(vectors.signedAction.actionId)?.state)
+      .toBe("completed");
+    store.close();
+  });
+
+  it("rejects a receipt when the URL device and signed receipt device differ", async () => {
+    const store = pairedStore();
+    const principalId = deriveOpaquePrincipalId(
+      issuer,
+      "device-owner-123"
+    );
+    store.putDevice({
+      deviceId: "dev_other_001",
+      principalId,
+      identityJson: JSON.stringify({
+        version: "kyntral.device.v1",
+        deviceId: "dev_other_001",
+        platform: "ios",
+        signingPublicKey: vectors.deviceSigningPublicKeyJwk,
+        keyAgreementPublicKey: vectors.deviceKeyAgreementPublicKeyJwk,
+        createdAt: "2026-10-06T22:00:00.000Z"
+      }),
+      createdAt: "2026-10-06T22:00:00.000Z",
+      revokedAt: null
+    });
+    const handler = createKyntralHttpHandler({
+      ...configForScopes([KYNTRAL_SCOPES.receiptSubmit]),
+      store,
+      now: () => new Date("2026-10-06T23:01:00.000Z")
+    });
+
+    const response = await handler(request(
+      "/v1/devices/dev_other_001/receipts",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(vectors.signedReceipt)
+      }
+    ));
+    expect(response.status).toBe(400);
+    expect(store.getJob(vectors.signedAction.actionId)?.state)
+      .toBe("queued");
+    store.close();
   });
 });
