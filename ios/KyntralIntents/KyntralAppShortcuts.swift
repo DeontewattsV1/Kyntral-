@@ -5,6 +5,15 @@ import AppIntents
 struct KyntralAppShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
         AppShortcut(
+            intent: StageMediaIntakeIntent(),
+            phrases: [
+                "Stage media links with \(.applicationName)"
+            ],
+            shortTitle: "Stage Media",
+            systemImageName: "tray.and.arrow.down"
+        )
+
+        AppShortcut(
             intent: MediaIntakeIntent(),
             phrases: [
                 "Run media intake with \(.applicationName)",

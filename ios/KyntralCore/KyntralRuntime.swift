@@ -8,16 +8,62 @@ public enum KyntralRuntimeError: Error {
     case workflowNotConfigured
     case invalidDestinationBookmark
     case invalidResolverConfiguration
+    case noLocalWorkflowInput
 }
 
 public actor KyntralRuntime {
     public static let shared = KyntralRuntime()
     private let registry: LocalWorkflowRegistry
     private let ledger: DedupeLedger
+    private let inbox: LocalWorkflowInbox
 
-    public init(registry: LocalWorkflowRegistry = .shared, ledger: DedupeLedger = .shared) {
+    public init(
+        registry: LocalWorkflowRegistry = .shared,
+        ledger: DedupeLedger = .shared,
+        inbox: LocalWorkflowInbox = .shared
+    ) {
         self.registry = registry
         self.ledger = ledger
+        self.inbox = inbox
+    }
+
+    public func stageMediaIntakeURLs(
+        workflowId: String = "wf_media_intake",
+        urls: [URL]
+    ) async throws {
+        try await inbox.replaceMediaIntakeURLs(
+            workflowId: workflowId,
+            urls: urls
+        )
+    }
+
+    public func executeVerifiedAction(
+        _ verified: VerifiedAction
+    ) async -> MediaIntakeResult {
+        let action = verified.action
+        guard action.workflowId == "wf_media_intake",
+              action.capability == "workflow.execute",
+              action.risk == .k2 else {
+            return MediaIntakeResult(completed: 0, duplicates: 0, failed: 1)
+        }
+
+        let urls = await inbox.mediaIntakeURLs(workflowId: action.workflowId)
+        guard !urls.isEmpty else {
+            return MediaIntakeResult(completed: 0, duplicates: 0, failed: 1)
+        }
+
+        do {
+            let result = try await runMediaIntake(
+                workflowId: action.workflowId,
+                urls: urls
+            )
+            if result.failed == 0 {
+                try await inbox.clear(workflowId: action.workflowId)
+            }
+            return result
+        } catch {
+            return MediaIntakeResult(completed: 0, duplicates: 0, failed: 1)
+        }
     }
 
     public func configureMediaIntake(

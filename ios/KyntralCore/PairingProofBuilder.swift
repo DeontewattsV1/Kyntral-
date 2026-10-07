@@ -64,6 +64,7 @@ public struct PairingCompletion: Codable, Sendable, Equatable {
     public let state: String
     public let signingKeyId: String
     public let keyAgreementKeyId: String
+    public let authorizationSigningKey: KyntralPublicJWK
 }
 
 public struct PairedDeviceStatus: Codable, Sendable, Equatable {
@@ -137,6 +138,11 @@ public struct KyntralPairingClient {
         guard completion.deviceId == proof.deviceIdentity.deviceId,
               completion.signingKeyId == proof.deviceIdentity.signingPublicKey.kid,
               completion.keyAgreementKeyId == proof.deviceIdentity.keyAgreementPublicKey.kid,
+              completion.authorizationSigningKey.kty == "EC",
+              completion.authorizationSigningKey.crv == "P-256",
+              completion.authorizationSigningKey.use == "sig",
+              completion.authorizationSigningKey.alg == "ES256",
+              !completion.authorizationSigningKey.kid.isEmpty,
               completion.state == "paired" else {
             throw PairingClientError.responseMismatch
         }
