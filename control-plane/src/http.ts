@@ -20,7 +20,7 @@ import {
 } from "./pairing.js";
 import { verifyAndStoreReceipt } from "./receipt.js";
 import { KYNTRAL_SCOPES, createKyntralServer } from "./server.js";
-import { SqliteKyntralStore } from "./store.js";
+import { SqliteKyntralStore, type KyntralStore } from "./store.js";
 
 export type KyntralHttpConfig = Readonly<{
   publicMcpUrl: URL;
@@ -31,6 +31,8 @@ export type KyntralHttpConfig = Readonly<{
   actionSigner: Es256ActionSigner;
   databasePath: string;
   oauthFetch?: typeof fetch;
+  store?: KyntralStore;
+  now?: () => Date;
 }>;
 
 const MAX_DEVICE_REQUEST_BYTES = 64 * 1024;
@@ -177,7 +179,8 @@ export function loadHttpConfig(
 }
 
 export function createKyntralHttpHandler(config: KyntralHttpConfig) {
-  const store = new SqliteKyntralStore(config.databasePath);
+  const store = config.store ?? new SqliteKyntralStore(config.databasePath);
+  const now = config.now ?? (() => new Date());
   const mcpHandler = createMcpHandler(() =>
     createKyntralServer({
       store,
@@ -316,7 +319,7 @@ export function createKyntralHttpHandler(config: KyntralHttpConfig) {
         return Response.json({ error: "device_revoked" }, { status: 403 });
       }
 
-      const delivery = store.claimNextAction(actionDeviceId);
+      const delivery = store.claimNextAction(actionDeviceId, now());
       if (!delivery) return new Response(null, { status: 204 });
 
       return Response.json({
@@ -355,7 +358,8 @@ export function createKyntralHttpHandler(config: KyntralHttpConfig) {
         const result = verifyAndStoreReceipt({
           store,
           principalId: principalId(authInfo),
-          receipt
+          receipt,
+          now: now()
         });
         return Response.json({
           status: result.status,
