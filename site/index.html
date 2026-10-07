@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Kyntral — AI coordinates. You control.</title>
+  <meta name="description" content="Kyntral is the permission layer between AI and your devices.">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <main>
+    <nav><strong>Kyntral</strong><a href="#privacy">Privacy</a><a href="#developers">Developers</a><a href="./support.html">Support</a></nav>
+    <section class="hero">
+      <p class="eyebrow">THE PERMISSION LAYER BETWEEN AI AND YOUR DEVICES</p>
+      <h1>AI coordinates.<br>You control.</h1>
+      <p class="lede">Kyntral lets AI systems request narrow, revocable capabilities while your paired device remains the execution authority.</p>
+      <div class="actions">
+        <a class="primary" href="https://www.icloud.com/shortcuts/effa6cac2e9b4702bed9128a8749e1f8">Install the Shortcut</a>
+        <a href="https://github.com/DeontewattsV1/Kyntral-">View source</a>
+      </div>
+      <p class="rc">v0.1 RC · not yet a production service</p>
+    </section>
+    <section class="cards">
+      <article><span>01</span><h2>Proposal</h2><p>ChatGPT, Grok, or another MCP client requests a capability.</p></article>
+      <article><span>02</span><h2>Authorization</h2><p>Kyntral checks principal, paired device, scope, workflow, risk, expiry, and grant.</p></article>
+      <article><span>03</span><h2>Execution</h2><p>The paired device verifies the signed action and performs the approved local work.</p></article>
+      <article><span>04</span><h2>Verification</h2><p>A device-signed receipt is bound to the exact authorized action.</p></article>
+    </section>
+    <section id="privacy" class="split">
+      <div><p class="eyebrow">LOCAL-FIRST PRIVACY</p><h2>Capabilities without custody.</h2></div>
+      <p>Kyntral Cloud should not need Notes text, source URLs, media bytes, clipboard contents, or destination filenames to authorize a local workflow. The control plane handles opaque authority metadata; private workflow inputs stay on the device whenever possible.</p>
+    </section>
+    <section id="developers" class="split">
+      <div><p class="eyebrow">FOR DEVELOPERS</p><h2>Portable capability contracts.</h2></div>
+      <p>Protocol schemas, conformance vectors, and the protocol-facing SDK are designed for interoperability. Capability manifests declare requirements; they never grant themselves authority.</p>
+    </section>
+    <footer><span>Kyntral v0.1 RC</span><a href="./privacy.html">Privacy</a><a href="./terms.html">Terms</a><a href="./support.html">Support</a></footer>
+  </main>
+</body>
+</html>
