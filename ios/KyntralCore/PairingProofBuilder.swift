@@ -218,7 +218,7 @@ public struct KyntralPairingClient {
     private func validateAccessToken(_ token: String) throws {
         guard !token.isEmpty,
               token.count <= 16_384,
-              token.unicodeScalars.allSatisfy({ !$0.properties.isControl }) else {
+              token.rangeOfCharacter(from: .controlCharacters) == nil else {
             throw PairingClientError.invalidAccessToken
         }
     }
