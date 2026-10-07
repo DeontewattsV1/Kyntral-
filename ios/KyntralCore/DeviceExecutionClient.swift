@@ -16,8 +16,15 @@ public enum DeviceExecutionClientError: Error {
     case invalidAccessToken
     case invalidDeviceId
     case noTrustedAuthorizationKey
+    case deviceMismatch
     case unexpectedResponse(Int)
     case receiptNotVerified
+}
+
+public enum DeviceExecutionCycleResult: Sendable, Equatable {
+    case idle
+    case receiptUploaded(actionId: String)
+    case executed(actionId: String, outcome: String)
 }
 
 public struct DeviceExecutionClient: Sendable {
@@ -27,6 +34,8 @@ public struct DeviceExecutionClient: Sendable {
     private let runtime: KyntralRuntime
     private let receiptSigner: ReceiptSigner
     private let journal: ExecutionJournal
+    private let keyManager: DeviceKeyManager
+    private let trustStore: AuthorizationTrustStore
 
     public init(
         serviceBaseURL: URL,
@@ -34,7 +43,9 @@ public struct DeviceExecutionClient: Sendable {
         verifier: ActionVerifier = ActionVerifier(),
         runtime: KyntralRuntime = .shared,
         receiptSigner: ReceiptSigner = ReceiptSigner(),
-        journal: ExecutionJournal = .shared
+        journal: ExecutionJournal = .shared,
+        keyManager: DeviceKeyManager = .shared,
+        trustStore: AuthorizationTrustStore = .shared
     ) throws {
         guard serviceBaseURL.scheme?.lowercased() == "https",
               serviceBaseURL.host != nil,
@@ -47,6 +58,8 @@ public struct DeviceExecutionClient: Sendable {
         self.runtime = runtime
         self.receiptSigner = receiptSigner
         self.journal = journal
+        self.keyManager = keyManager
+        self.trustStore = trustStore
 
         if let session {
             self.session = session
@@ -60,21 +73,38 @@ public struct DeviceExecutionClient: Sendable {
     }
 
     public func processNext(
-        deviceId: String,
-        scopeId: String,
-        authorizationKey: KyntralPublicJWK,
         accessToken: String
-    ) async throws -> SignedExecutionReceipt? {
+    ) async throws -> DeviceExecutionCycleResult {
         try validateAccessToken(accessToken)
-        try validateOpaqueId(deviceId)
+        let identity = try await keyManager.identity()
+        try validateOpaqueId(identity.deviceId)
+
+        if let pending = await journal.firstPendingReceipt() {
+            guard pending.deviceId == identity.deviceId else {
+                throw DeviceExecutionClientError.deviceMismatch
+            }
+            try await submitAndAcknowledge(
+                receipt: pending,
+                deviceId: identity.deviceId,
+                accessToken: accessToken
+            )
+            return .receiptUploaded(actionId: pending.actionId)
+        }
+
+        guard let authorizationKey = try await trustStore.current() else {
+            throw DeviceExecutionClientError.noTrustedAuthorizationKey
+        }
 
         let endpoint = try endpointURL(
-            path: "/v1/devices/" + deviceId + "/actions/next"
+            path: "/v1/devices/" + identity.deviceId + "/actions/next"
         )
         var request = URLRequest(url: endpoint)
         request.httpMethod = "GET"
         request.timeoutInterval = 30
-        request.setValue("Bearer " + accessToken, forHTTPHeaderField: "Authorization")
+        request.setValue(
+            "Bearer " + accessToken,
+            forHTTPHeaderField: "Authorization"
+        )
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.cachePolicy = .reloadIgnoringLocalCacheData
 
@@ -82,12 +112,18 @@ public struct DeviceExecutionClient: Sendable {
         guard let http = response as? HTTPURLResponse else {
             throw DeviceExecutionClientError.unexpectedResponse(-1)
         }
-        if http.statusCode == 204 { return nil }
+        if http.statusCode == 204 { return .idle }
         guard http.statusCode == 200 else {
             throw DeviceExecutionClientError.unexpectedResponse(http.statusCode)
         }
 
-        let delivery = try JSONDecoder().decode(DeviceActionDelivery.self, from: data)
+        let delivery = try JSONDecoder().decode(
+            DeviceActionDelivery.self,
+            from: data
+        )
+        guard delivery.action.deviceId == identity.deviceId else {
+            throw DeviceExecutionClientError.deviceMismatch
+        }
 
         if let existing = await journal.receipt(
             actionId: delivery.action.actionId
@@ -95,23 +131,18 @@ public struct DeviceExecutionClient: Sendable {
             guard existing.actionHash == (try delivery.action.actionHash()) else {
                 throw DeviceExecutionClientError.receiptNotVerified
             }
-            let acceptance = try await submit(
+            try await submitAndAcknowledge(
                 receipt: existing,
-                deviceId: deviceId,
+                deviceId: identity.deviceId,
                 accessToken: accessToken
             )
-            guard acceptance.verified,
-                  acceptance.status == "accepted" ||
-                    acceptance.status == "duplicate" else {
-                throw DeviceExecutionClientError.receiptNotVerified
-            }
-            return existing
+            return .receiptUploaded(actionId: existing.actionId)
         }
 
         let verified = try await verifier.verifyAndConsume(
             action: delivery.action,
             context: TrustedActionContext(
-                scopeId: scopeId,
+                scopeId: delivery.action.scopeId,
                 authorizationKey: authorizationKey
             )
         )
@@ -131,8 +162,25 @@ public struct DeviceExecutionClient: Sendable {
             completedAt: completedAt
         )
 
+        // Durably persist proof of local execution before any network upload.
         try await journal.record(receipt)
 
+        try await submitAndAcknowledge(
+            receipt: receipt,
+            deviceId: identity.deviceId,
+            accessToken: accessToken
+        )
+        return .executed(
+            actionId: receipt.actionId,
+            outcome: receipt.outcome
+        )
+    }
+
+    private func submitAndAcknowledge(
+        receipt: SignedExecutionReceipt,
+        deviceId: String,
+        accessToken: String
+    ) async throws {
         let acceptance = try await submit(
             receipt: receipt,
             deviceId: deviceId,
@@ -143,7 +191,7 @@ public struct DeviceExecutionClient: Sendable {
                 acceptance.status == "duplicate" else {
             throw DeviceExecutionClientError.receiptNotVerified
         }
-        return receipt
+        try await journal.remove(actionId: receipt.actionId)
     }
 
     private func submit(
@@ -157,9 +205,15 @@ public struct DeviceExecutionClient: Sendable {
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
         request.timeoutInterval = 30
-        request.setValue("Bearer " + accessToken, forHTTPHeaderField: "Authorization")
+        request.setValue(
+            "Bearer " + accessToken,
+            forHTTPHeaderField: "Authorization"
+        )
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(
+            "application/json",
+            forHTTPHeaderField: "Content-Type"
+        )
         request.httpBody = try JSONEncoder().encode(receipt)
 
         let (data, response) = try await session.data(for: request)
