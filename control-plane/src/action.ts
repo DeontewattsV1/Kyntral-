@@ -12,6 +12,7 @@ import {
   computeActionHash,
   signingPreimage,
   type CanonicalJson,
+  type Es256Proof,
   type P256PublicJwk,
   type SignedActionEnvelope
 } from "./crypto.js";
@@ -93,14 +94,15 @@ export function issueSignedAction(input: {
       unsigned as unknown as CanonicalJson
     )
   );
+  const authorizationProof: Es256Proof = {
+    keyId: input.signer.publicKey.kid,
+    algorithm: "ES256",
+    signature
+  };
 
   const action: SignedActionEnvelope = Object.freeze({
     ...unsigned,
-    authorizationProof: {
-      keyId: input.signer.publicKey.kid,
-      algorithm: "ES256",
-      signature
-    }
+    authorizationProof
   });
 
   return Object.freeze({
