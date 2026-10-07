@@ -3,18 +3,27 @@
 import { readFileSync } from "node:fs";
 import {
   generateKeyPairSync,
-  type JsonWebKey
+  sign,
+  type JsonWebKey,
+  type KeyObject
 } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 import {
   Es256ActionSigner,
   type P256PrivateJwk
 } from "../src/action.js";
-import type {
-  ExecutionReceipt,
-  P256PublicJwk,
-  SignedActionEnvelope
+import {
+  receiptSigningPreimage,
+  type ExecutionReceipt,
+  type P256PublicJwk,
+  type SignedActionEnvelope
 } from "../src/crypto.js";
+import {
+  deviceRequestSigningPreimage,
+  encodeDeviceRequestHeader,
+  sha256Bytes,
+  type DeviceRequestProof
+} from "../src/device-request.js";
 import { createCloudJob } from "../src/domain.js";
 import { deriveOpaquePrincipalId } from "../src/oauth.js";
 import { KYNTRAL_SCOPES } from "../src/server.js";
@@ -42,6 +51,100 @@ const vectors = JSON.parse(
   signedReceipt: ExecutionReceipt;
 };
 
+
+function testDeviceKeyPair(
+  kid: string,
+  use: "sig" | "enc",
+  alg: "ES256" | "ECDH-ES"
+): { privateKey: KeyObject; publicJwk: P256PublicJwk } {
+  const pair = generateKeyPairSync("ec", { namedCurve: "P-256" });
+  const jwk = pair.publicKey.export({ format: "jwk" }) as JsonWebKey;
+  return {
+    privateKey: pair.privateKey,
+    publicJwk: {
+      kty: "EC",
+      crv: "P-256",
+      x: String(jwk.x),
+      y: String(jwk.y),
+      kid,
+      use,
+      alg
+    }
+  };
+}
+
+const testDeviceSigning = testDeviceKeyPair(
+  "device-http-sign-001",
+  "sig",
+  "ES256"
+);
+const testDeviceAgreement = testDeviceKeyPair(
+  "device-http-kex-001",
+  "enc",
+  "ECDH-ES"
+);
+
+function deviceRequestHeader(input: {
+  deviceId: string;
+  method: "GET" | "POST";
+  path: string;
+  body?: Uint8Array;
+  now: Date;
+  nonceByte: number;
+}): string {
+  const body = input.body ?? new Uint8Array();
+  const unsigned: DeviceRequestProof = {
+    version: "kyntral.device-request.v1",
+    deviceId: input.deviceId,
+    method: input.method,
+    path: input.path,
+    bodyHash: sha256Bytes(body),
+    nonce: Buffer.alloc(32, input.nonceByte).toString("base64url"),
+    issuedAt: input.now.toISOString(),
+    expiresAt: new Date(input.now.getTime() + 30_000).toISOString(),
+    proof: {
+      keyId: testDeviceSigning.publicJwk.kid,
+      algorithm: "ES256",
+      signature: "placeholder"
+    }
+  };
+  const signature = sign(
+    "sha256",
+    deviceRequestSigningPreimage(unsigned),
+    testDeviceSigning.privateKey
+  ).toString("base64url");
+  return encodeDeviceRequestHeader({
+    ...unsigned,
+    proof: {
+      ...unsigned.proof,
+      signature
+    }
+  });
+}
+
+function testSignedReceipt(): ExecutionReceipt {
+  const unsigned: ExecutionReceipt = {
+    ...vectors.signedReceipt,
+    deviceProof: {
+      keyId: testDeviceSigning.publicJwk.kid,
+      algorithm: "ES256",
+      signature: "placeholder"
+    }
+  };
+  const signature = sign(
+    "sha256",
+    receiptSigningPreimage(unsigned),
+    testDeviceSigning.privateKey
+  ).toString("base64url");
+  return {
+    ...unsigned,
+    deviceProof: {
+      ...unsigned.deviceProof,
+      signature
+    }
+  };
+}
+
 function pairedStore(
   revokedAt: string | null = null
 ): SqliteKyntralStore {
@@ -57,8 +160,8 @@ function pairedStore(
       version: "kyntral.device.v1",
       deviceId: vectors.signedAction.deviceId,
       platform: "ios",
-      signingPublicKey: vectors.deviceSigningPublicKeyJwk,
-      keyAgreementPublicKey: vectors.deviceKeyAgreementPublicKeyJwk,
+      signingPublicKey: testDeviceSigning.publicJwk,
+      keyAgreementPublicKey: testDeviceAgreement.publicJwk,
       createdAt: "2026-10-06T22:00:00.000Z"
     }),
     createdAt: "2026-10-06T22:00:00.000Z",
@@ -281,7 +384,18 @@ describe("device action delivery HTTP surface", () => {
     const path =
       "/v1/devices/" + vectors.signedAction.deviceId + "/actions/next";
 
-    const first = await handler(request(path));
+    const now = new Date("2026-10-06T23:01:00.000Z");
+    const first = await handler(request(path, {
+      headers: {
+        "x-kyntral-device-proof": deviceRequestHeader({
+          deviceId: vectors.signedAction.deviceId,
+          method: "GET",
+          path,
+          now,
+          nonceByte: 1
+        })
+      }
+    }));
     expect(first.status).toBe(200);
     const firstBody = await first.json() as {
       action: SignedActionEnvelope;
@@ -290,7 +404,17 @@ describe("device action delivery HTTP surface", () => {
     expect(store.getJob(vectors.signedAction.actionId)?.state)
       .toBe("executing");
 
-    const resumed = await handler(request(path));
+    const resumed = await handler(request(path, {
+      headers: {
+        "x-kyntral-device-proof": deviceRequestHeader({
+          deviceId: vectors.signedAction.deviceId,
+          method: "GET",
+          path,
+          now,
+          nonceByte: 2
+        })
+      }
+    }));
     expect(resumed.status).toBe(200);
     const resumedBody = await resumed.json() as {
       action: SignedActionEnvelope;
@@ -351,10 +475,22 @@ describe("device receipt HTTP surface", () => {
       store,
       now: () => new Date("2026-10-06T23:01:00.000Z")
     });
+    const receipt = testSignedReceipt();
+    const receiptBody = Buffer.from(JSON.stringify(receipt), "utf8");
     const accepted = await handler(request(receiptPath, {
       method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(vectors.signedReceipt)
+      headers: {
+        "content-type": "application/json",
+        "x-kyntral-device-proof": deviceRequestHeader({
+          deviceId: vectors.signedAction.deviceId,
+          method: "POST",
+          path: receiptPath,
+          body: receiptBody,
+          now: new Date("2026-10-06T23:01:00.000Z"),
+          nonceByte: 3
+        })
+      },
+      body: receiptBody
     }));
     expect(accepted.status).toBe(201);
     const body = await accepted.json() as {
@@ -383,8 +519,8 @@ describe("device receipt HTTP surface", () => {
         version: "kyntral.device.v1",
         deviceId: "dev_other_001",
         platform: "ios",
-        signingPublicKey: vectors.deviceSigningPublicKeyJwk,
-        keyAgreementPublicKey: vectors.deviceKeyAgreementPublicKeyJwk,
+        signingPublicKey: testDeviceSigning.publicJwk,
+        keyAgreementPublicKey: testDeviceAgreement.publicJwk,
         createdAt: "2026-10-06T22:00:00.000Z"
       }),
       createdAt: "2026-10-06T22:00:00.000Z",
@@ -396,12 +532,28 @@ describe("device receipt HTTP surface", () => {
       now: () => new Date("2026-10-06T23:01:00.000Z")
     });
 
+    const mismatchedReceipt = testSignedReceipt();
+    const mismatchBody = Buffer.from(
+      JSON.stringify(mismatchedReceipt),
+      "utf8"
+    );
+    const mismatchPath = "/v1/devices/dev_other_001/receipts";
     const response = await handler(request(
-      "/v1/devices/dev_other_001/receipts",
+      mismatchPath,
       {
         method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(vectors.signedReceipt)
+        headers: {
+          "content-type": "application/json",
+          "x-kyntral-device-proof": deviceRequestHeader({
+            deviceId: "dev_other_001",
+            method: "POST",
+            path: mismatchPath,
+            body: mismatchBody,
+            now: new Date("2026-10-06T23:01:00.000Z"),
+            nonceByte: 4
+          })
+        },
+        body: mismatchBody
       }
     ));
     expect(response.status).toBe(400);
