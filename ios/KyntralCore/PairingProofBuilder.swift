@@ -166,17 +166,47 @@ public actor AuthorizationTrustStore {
               key.crv == "P-256",
               key.use == "sig",
               key.alg == "ES256",
-              key.x.range(
-                of: "^[A-Za-z0-9_-]{43}$",
-                options: .regularExpression
-              ) != nil,
-              key.y.range(
-                of: "^[A-Za-z0-9_-]{43}$",
-                options: .regularExpression
-              ) != nil,
+              let x = decodeBase64URL(key.x),
+              let y = decodeBase64URL(key.y),
+              x.count == 32,
+              y.count == 32,
               !key.kid.isEmpty else {
             throw AuthorizationTrustError.invalidKey
         }
+
+        var raw = Data([0x04])
+        raw.append(x)
+        raw.append(y)
+        let attributes: [String: Any] = [
+            kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom,
+            kSecAttrKeyClass as String: kSecAttrKeyClassPublic,
+            kSecAttrKeySizeInBits as String: 256
+        ]
+        var error: Unmanaged<CFError>?
+        guard SecKeyCreateWithData(
+            raw as CFData,
+            attributes as CFDictionary,
+            &error
+        ) != nil else {
+            throw AuthorizationTrustError.invalidKey
+        }
+    }
+
+    private static func decodeBase64URL(_ value: String) -> Data? {
+        guard value.range(
+            of: "^[A-Za-z0-9_-]+$",
+            options: .regularExpression
+        ) != nil else {
+            return nil
+        }
+        var base64 = value
+            .replacingOccurrences(of: "-", with: "+")
+            .replacingOccurrences(of: "_", with: "/")
+        let remainder = base64.count % 4
+        if remainder != 0 {
+            base64 += String(repeating: "=", count: 4 - remainder)
+        }
+        return Data(base64Encoded: base64)
     }
 }
 
