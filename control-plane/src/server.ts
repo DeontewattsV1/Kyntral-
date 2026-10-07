@@ -33,6 +33,7 @@ import type { KyntralStore } from "./store.js";
 export const KYNTRAL_SCOPES = {
   read: "kyntral.read",
   execute: "kyntral.execute",
+  deviceExecute: "kyntral.device.execute",
   receiptSubmit: "kyntral.receipt.submit",
   pair: "kyntral.pair",
   revoke: "kyntral.revoke"
@@ -511,7 +512,8 @@ export function createKyntralServer(
         deviceId: identity.deviceId,
         state: "paired",
         signingKeyId: identity.signingPublicKey.kid,
-        keyAgreementKeyId: identity.keyAgreementPublicKey.kid
+        keyAgreementKeyId: identity.keyAgreementPublicKey.kid,
+        authorizationSigningKey: options.actionSigner.publicKey
       });
     }
   );
