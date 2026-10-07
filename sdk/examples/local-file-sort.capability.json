@@ -1,0 +1,22 @@
+{
+  "version": "kyntral.capability.v1",
+  "id": "org.kyntral.local-file-sort",
+  "moduleVersion": "0.1.0",
+  "publisher": {
+    "id": "kyntral_core",
+    "name": "Kyntral",
+    "repository": "https://github.com/DeontewattsV1/Kyntral-"
+  },
+  "risk": "K1",
+  "execution": {
+    "location": "device",
+    "backgroundAllowed": true
+  },
+  "deviceData": ["files"],
+  "network": {
+    "access": "none"
+  },
+  "sideEffects": ["local-read", "local-write"],
+  "destinations": ["dest_local_sorted"],
+  "minimumKyntralVersion": "0.1.0"
+}
