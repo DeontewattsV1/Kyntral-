@@ -94,6 +94,7 @@ This roadmap is ordered by trust boundary. A checked box means executable reposi
 - [x] support path source
 - [x] pre-release terms source
 - [x] landing-page source
+- [x] public RC landing preview deployed (`https://kyntral-rc.vercel.app/`)
 - [x] Product Hunt launch plan
 - [ ] landing page deployed on canonical Kyntral domain
 - [ ] final Kyntral mark and export-ready brand assets
