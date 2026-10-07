@@ -5,10 +5,19 @@ import { describe, expect, it } from "vitest";
 import { parseCapabilityManifestV1 } from "../sdk/src/index.js";
 
 describe("CAP-001 Capability Manifest v1", () => {
-  it("accepts the KYN-W01 example", () => {
-    const manifest = JSON.parse(readFileSync(new URL("../sdk/examples/media-intake.capability.json", import.meta.url), "utf8"));
-    expect(parseCapabilityManifestV1(manifest).version).toBe("kyntral.capability.v1");
-  });
+  for (const example of [
+    "media-intake.capability.json",
+    "local-file-sort.capability.json"
+  ]) {
+    it("accepts extension example: " + example, () => {
+      const manifest = JSON.parse(readFileSync(
+        new URL("../sdk/examples/" + example, import.meta.url),
+        "utf8"
+      ));
+      expect(parseCapabilityManifestV1(manifest).version)
+        .toBe("kyntral.capability.v1");
+    });
+  }
 
   it("rejects arbitrary network access", () => {
     expect(() => parseCapabilityManifestV1({
