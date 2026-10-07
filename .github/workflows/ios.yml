@@ -1,0 +1,38 @@
+name: iOS
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "ios/**"
+      - ".github/workflows/ios.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "ios/**"
+      - ".github/workflows/ios.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  ios-build-test:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Select latest installed Xcode
+        run: |
+          XCODE_PATH=$(ls -d /Applications/Xcode*.app | sort -V | tail -1)
+          sudo xcode-select -s "$XCODE_PATH/Contents/Developer"
+          xcodebuild -version
+
+      - name: Build and test Kyntral iOS
+        run: |
+          xcodebuild \
+            -project ios/Kyntral.xcodeproj \
+            -scheme Kyntral \
+            -destination 'platform=iOS Simulator,name=iPhone 16' \
+            CODE_SIGNING_ALLOWED=NO \
+            test
