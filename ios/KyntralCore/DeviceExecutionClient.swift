@@ -26,13 +26,15 @@ public struct DeviceExecutionClient: Sendable {
     private let verifier: ActionVerifier
     private let runtime: KyntralRuntime
     private let receiptSigner: ReceiptSigner
+    private let journal: ExecutionJournal
 
     public init(
         serviceBaseURL: URL,
         session: URLSession? = nil,
         verifier: ActionVerifier = ActionVerifier(),
         runtime: KyntralRuntime = .shared,
-        receiptSigner: ReceiptSigner = ReceiptSigner()
+        receiptSigner: ReceiptSigner = ReceiptSigner(),
+        journal: ExecutionJournal = .shared
     ) throws {
         guard serviceBaseURL.scheme?.lowercased() == "https",
               serviceBaseURL.host != nil,
@@ -44,6 +46,7 @@ public struct DeviceExecutionClient: Sendable {
         self.verifier = verifier
         self.runtime = runtime
         self.receiptSigner = receiptSigner
+        self.journal = journal
 
         if let session {
             self.session = session
@@ -85,6 +88,26 @@ public struct DeviceExecutionClient: Sendable {
         }
 
         let delivery = try JSONDecoder().decode(DeviceActionDelivery.self, from: data)
+
+        if let existing = await journal.receipt(
+            actionId: delivery.action.actionId
+        ) {
+            guard existing.actionHash == (try delivery.action.actionHash()) else {
+                throw DeviceExecutionClientError.receiptNotVerified
+            }
+            let acceptance = try await submit(
+                receipt: existing,
+                deviceId: deviceId,
+                accessToken: accessToken
+            )
+            guard acceptance.verified,
+                  acceptance.status == "accepted" ||
+                    acceptance.status == "duplicate" else {
+                throw DeviceExecutionClientError.receiptNotVerified
+            }
+            return existing
+        }
+
         let verified = try await verifier.verifyAndConsume(
             action: delivery.action,
             context: TrustedActionContext(
@@ -107,6 +130,8 @@ public struct DeviceExecutionClient: Sendable {
             startedAt: startedAt,
             completedAt: completedAt
         )
+
+        try await journal.record(receipt)
 
         let acceptance = try await submit(
             receipt: receipt,
