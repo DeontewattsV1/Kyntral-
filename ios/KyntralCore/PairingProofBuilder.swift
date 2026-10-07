@@ -88,15 +88,104 @@ public enum PairingClientError: Error {
     case responseMismatch
 }
 
+public enum AuthorizationTrustError: Error {
+    case invalidKey
+    case keyMismatch
+    case keychain(OSStatus)
+}
+
+public actor AuthorizationTrustStore {
+    public static let shared = AuthorizationTrustStore()
+
+    private let service = "com.deontewatts.kyntral.authorization-trust"
+    private let account = "action-signing-key"
+
+    public init() {}
+
+    public func current() throws -> KyntralPublicJWK? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+        var result: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        if status == errSecItemNotFound { return nil }
+        guard status == errSecSuccess,
+              let data = result as? Data else {
+            throw AuthorizationTrustError.keychain(status)
+        }
+        return try JSONDecoder().decode(KyntralPublicJWK.self, from: data)
+    }
+
+    public func pin(_ key: KyntralPublicJWK) throws {
+        try Self.validate(key)
+        if let existing = try current() {
+            guard existing == key else {
+                throw AuthorizationTrustError.keyMismatch
+            }
+            return
+        }
+
+        let data = try JSONEncoder().encode(key)
+        let item: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+            kSecValueData as String: data,
+            kSecAttrAccessible as String:
+                kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+        ]
+        let status = SecItemAdd(item as CFDictionary, nil)
+        guard status == errSecSuccess else {
+            throw AuthorizationTrustError.keychain(status)
+        }
+    }
+
+    public func resetForExplicitRepair() throws {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account
+        ]
+        let status = SecItemDelete(query as CFDictionary)
+        guard status == errSecSuccess || status == errSecItemNotFound else {
+            throw AuthorizationTrustError.keychain(status)
+        }
+    }
+
+    public static func validate(_ key: KyntralPublicJWK) throws {
+        guard key.kty == "EC",
+              key.crv == "P-256",
+              key.use == "sig",
+              key.alg == "ES256",
+              key.x.range(
+                of: "^[A-Za-z0-9_-]{43}$",
+                options: .regularExpression
+              ) != nil,
+              key.y.range(
+                of: "^[A-Za-z0-9_-]{43}$",
+                options: .regularExpression
+              ) != nil,
+              !key.kid.isEmpty else {
+            throw AuthorizationTrustError.invalidKey
+        }
+    }
+}
+
 public struct KyntralPairingClient {
     private let serviceBaseURL: URL
     private let session: URLSession
     private let proofBuilder: PairingProofBuilder
+    private let trustStore: AuthorizationTrustStore
 
     public init(
         serviceBaseURL: URL,
         session: URLSession? = nil,
-        proofBuilder: PairingProofBuilder = PairingProofBuilder()
+        proofBuilder: PairingProofBuilder = PairingProofBuilder(),
+        trustStore: AuthorizationTrustStore = .shared
     ) throws {
         guard serviceBaseURL.scheme?.lowercased() == "https",
               serviceBaseURL.host != nil,
@@ -106,6 +195,7 @@ public struct KyntralPairingClient {
         }
         self.serviceBaseURL = serviceBaseURL
         self.proofBuilder = proofBuilder
+        self.trustStore = trustStore
 
         if let session {
             self.session = session
