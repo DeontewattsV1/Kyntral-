@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "kyntral",
-  "version": "0.1.0-prealpha",
+  "version": "0.1.0-rc.1",
   "description": "Coordinate explicitly authorized workflows on paired personal devices without giving AI custody of private device data.",
   "author": {
     "name": "Deonte Watts",
@@ -10,24 +10,30 @@
   "homepage": "https://github.com/DeontewattsV1/Kyntral-",
   "repository": "https://github.com/DeontewattsV1/Kyntral-",
   "license": "SEE LICENSE",
-  "keywords": ["mcp", "ios", "shortcuts", "automation", "privacy", "authorization"],
-  "skills": "./skills/",
-  "mcpServers": "./mcp.json",
+  "keywords": [
+    "mcp",
+    "ios",
+    "shortcuts",
+    "automation",
+    "privacy",
+    "authorization"
+  ],
   "extensions": {
     "com.openai": {
       "interface": {
         "displayName": "Kyntral",
-        "shortDescription": "Permissioned AI-to-device execution",
+        "shortDescription": "Private Kyntral workflows",
         "longDescription": "Kyntral coordinates narrowly scoped, user-authorized workflows on paired devices while keeping private workflow payloads on-device whenever possible.",
         "developerName": "Deonte Watts",
-        "category": "Productivity",
-        "capabilities": ["Read", "Write"],
+        "category": "Developer Tools",
+        "capabilities": ["Interactive"],
         "websiteURL": "https://github.com/DeontewattsV1/Kyntral-",
         "privacyPolicyURL": "https://github.com/DeontewattsV1/Kyntral-/blob/main/PRIVACY.md",
         "termsOfServiceURL": "https://github.com/DeontewattsV1/Kyntral-/blob/main/LICENSE",
         "defaultPrompt": [
-          "Use Kyntral to check my paired device capabilities.",
-          "Use Kyntral to preview an authorized local workflow before running it."
+          "Continue Kyntral release-candidate work without weakening authorization or privacy invariants.",
+          "Review Kyntral release readiness and identify the next real implementation boundary.",
+          "Check a proposed Kyntral integration change for authority, privacy, replay, and verification failures."
         ],
         "brandColor": "#746BFF"
       }
