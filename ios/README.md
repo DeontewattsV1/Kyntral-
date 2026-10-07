@@ -24,6 +24,23 @@ Kyntral iOS is the local execution authority. The checked-in Xcode project build
 - XCTest coverage for fail-closed authorization, canonical signing vectors, action verification/replay, pairing flow, and dedupe semantics;
 - GitHub Actions build and simulator-test gate.
 
+## Personal-device Shortcut
+
+Users can install the shared Kyntral Shortcut directly on their personal device:
+
+**[Install Kyntral Shortcut](https://www.icloud.com/shortcuts/effa6cac2e9b4702bed9128a8749e1f8)**
+
+The intended user path is:
+
+1. install the shared Shortcut;
+2. open Kyntral on that iPhone/iPad;
+3. pair the device using the Kyntral pairing flow;
+4. configure the exact local workflow and standing grant;
+5. use the Shortcut to stage private inputs locally;
+6. allow only signed, verified Kyntral ActionEnvelopes to trigger execution.
+
+The Shortcut is not an authorization credential. Its installation does not create a capability grant, pair a device, or bypass Kyntral's local standing-grant checks.
+
 ## Device/content boundary
 
 Private keys remain device-local. The standing grant for KYN-W01 applies only to the exact `wf_media_intake` / `workflow.execute` tuple; it is not arbitrary Shortcut, URL, shell, or device authority.

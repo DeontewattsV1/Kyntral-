@@ -26,6 +26,21 @@ struct ContentView: View {
                         .textSelection(.enabled)
                 }
 
+                Section("Personal-device Shortcut") {
+                    Link(
+                        "Install Kyntral Shortcut",
+                        destination: URL(
+                            string: "https://www.icloud.com/shortcuts/effa6cac2e9b4702bed9128a8749e1f8"
+                        )!
+                    )
+
+                    Text(
+                        "Install the Shortcut on this device, then pair the device and configure KYN-W01 in Kyntral. Installing the Shortcut alone does not grant device authority."
+                    )
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                }
+
                 Section("KYN-W01 Media Intake") {
                     TextField(
                         "Kyntral Scope ID",

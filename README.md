@@ -83,6 +83,26 @@ brand/          Kyntral brand system
 launch/         Product Hunt/release planning
 ```
 
+## Personal-device Shortcut
+
+Install the official shared Kyntral Shortcut on the iPhone or iPad you want to use with Kyntral:
+
+**[Install Kyntral Shortcut](https://www.icloud.com/shortcuts/effa6cac2e9b4702bed9128a8749e1f8)**
+
+Recommended onboarding flow:
+
+```text
+Install shared Shortcut
+-> open Kyntral on the personal device
+-> pair the device cryptographically
+-> configure KYN-W01 locally
+-> grant the exact local workflow
+-> Shortcut stages private media links locally
+-> signed Kyntral actions may execute that authorized workflow
+```
+
+The iCloud Shortcut link is a distribution/onboarding mechanism only. Installing it does **not** pair a device, grant Kyntral capabilities, or authorize arbitrary device control. Pairing and authorization remain separate Kyntral security operations.
+
 ## First conformance workflow
 
 **KYN-W01 — Media Intake**
