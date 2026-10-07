@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 
 import Foundation
+import Security
 
 public struct PairingChallenge: Codable, Sendable {
     public let version: String
@@ -97,10 +98,14 @@ public enum AuthorizationTrustError: Error {
 public actor AuthorizationTrustStore {
     public static let shared = AuthorizationTrustStore()
 
-    private let service = "com.deontewatts.kyntral.authorization-trust"
+    private let service: String
     private let account = "action-signing-key"
 
-    public init() {}
+    public init(
+        service: String = "com.deontewatts.kyntral.authorization-trust"
+    ) {
+        self.service = service
+    }
 
     public func current() throws -> KyntralPublicJWK? {
         let query: [String: Any] = [
