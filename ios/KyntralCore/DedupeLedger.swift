@@ -53,13 +53,42 @@ public actor DedupeLedger {
     }
 
     public static func sourceHash(_ url: URL) -> String {
-        guard var parts = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
-            return contentHash(Data(url.absoluteString.utf8))
+        contentHash(Data(canonicalSourceIdentity(url).utf8))
+    }
+
+    public static func canonicalSourceIdentity(_ url: URL) -> String {
+        let host = url.host?.lowercased()
+        let xHosts: Set<String> = [
+            "x.com",
+            "www.x.com",
+            "twitter.com",
+            "www.twitter.com",
+            "mobile.twitter.com"
+        ]
+        if let host, xHosts.contains(host) {
+            let components = url.path.split(separator: "/")
+            if let statusIndex = components.firstIndex(of: "status"),
+               components.indices.contains(statusIndex + 1) {
+                let statusId = String(components[statusIndex + 1])
+                if statusId.range(
+                    of: "^[0-9]+$",
+                    options: .regularExpression
+                ) != nil {
+                    return "x:status:" + statusId
+                }
+            }
+        }
+
+        guard var parts = URLComponents(
+            url: url,
+            resolvingAgainstBaseURL: false
+        ) else {
+            return url.absoluteString
         }
         parts.fragment = nil
         parts.scheme = parts.scheme?.lowercased()
         parts.host = parts.host?.lowercased()
-        return contentHash(Data((parts.string ?? url.absoluteString).utf8))
+        return parts.string ?? url.absoluteString
     }
 
     public static func contentHash(_ data: Data) -> String {
