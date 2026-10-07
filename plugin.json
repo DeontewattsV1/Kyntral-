@@ -26,10 +26,12 @@
         "longDescription": "Kyntral coordinates narrowly scoped, user-authorized workflows on paired devices while keeping private workflow payloads on-device whenever possible.",
         "developerName": "Deonte Watts",
         "category": "Developer Tools",
-        "capabilities": ["Interactive"],
+        "capabilities": [
+          "Interactive"
+        ],
         "websiteURL": "https://github.com/DeontewattsV1/Kyntral-",
         "privacyPolicyURL": "https://github.com/DeontewattsV1/Kyntral-/blob/main/PRIVACY.md",
-        "termsOfServiceURL": "https://github.com/DeontewattsV1/Kyntral-/blob/main/LICENSE",
+        "termsOfServiceURL": "https://github.com/DeontewattsV1/Kyntral-/blob/main/TERMS.md",
         "defaultPrompt": [
           "Continue Kyntral release-candidate work without weakening authorization or privacy invariants.",
           "Review Kyntral release readiness and identify the next real implementation boundary.",
