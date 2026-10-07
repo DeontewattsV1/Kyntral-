@@ -5,6 +5,7 @@ import UniformTypeIdentifiers
 
 struct ContentView: View {
     @State private var deviceID = "Loading local identity…"
+    @State private var scopeIdText = ""
     @State private var endpointText = ""
     @State private var destinationBookmark: Data?
     @State private var destinationName = "Not selected"
@@ -26,6 +27,13 @@ struct ContentView: View {
                 }
 
                 Section("KYN-W01 Media Intake") {
+                    TextField(
+                        "Kyntral Scope ID",
+                        text: $scopeIdText
+                    )
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+
                     TextField(
                         "Authorized Cobalt-compatible HTTPS endpoint",
                         text: $endpointText
@@ -54,7 +62,11 @@ struct ContentView: View {
                     Button("Save local workflow") {
                         Task { await saveWorkflow() }
                     }
-                    .disabled(destinationBookmark == nil || endpointText.isEmpty)
+                    .disabled(
+                        destinationBookmark == nil ||
+                        endpointText.isEmpty ||
+                        scopeIdText.isEmpty
+                    )
 
                     Text(statusMessage)
                         .font(.footnote)
@@ -86,9 +98,11 @@ struct ContentView: View {
         do {
             deviceID = try await DeviceKeyManager.shared.identity().deviceId
             let state = await KyntralRuntime.shared.workflowState(
-                id: "wf_media_intake"
+                id: "wf_media_intake",
+                scopeId: scopeIdText.isEmpty ? nil : scopeIdText
             )
             if let workflow = state.workflow {
+                scopeIdText = workflow.scopeId ?? ""
                 endpointText = workflow.resolverEndpoint?.absoluteString ?? ""
                 destinationBookmark = workflow.destinationBookmark
                 standingGrantAllowed = state.decision == .allowed
@@ -133,6 +147,7 @@ struct ContentView: View {
 
         do {
             try await KyntralRuntime.shared.configureMediaIntake(
+                scopeId: scopeIdText,
                 endpoint: endpoint,
                 destinationBookmark: destinationBookmark,
                 standingGrantAllowed: standingGrantAllowed
