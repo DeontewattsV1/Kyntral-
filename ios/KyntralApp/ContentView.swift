@@ -12,6 +12,10 @@ struct ContentView: View {
     @State private var standingGrantAllowed = false
     @State private var showingFolderPicker = false
     @State private var statusMessage = "KYN-W01 is not configured."
+    @State private var apiBaseURLText = ""
+    @State private var apiAccessToken = ""
+    @State private var apiStatusMessage = "This device is not linked through the User API."
+    @State private var apiBusy = false
 
     var body: some View {
         NavigationStack {
@@ -39,6 +43,53 @@ struct ContentView: View {
                     )
                     .font(.footnote)
                     .foregroundStyle(.secondary)
+                }
+
+                Section("Personal Device API") {
+                    TextField(
+                        "Kyntral API base URL",
+                        text: $apiBaseURLText
+                    )
+                    .textInputAutocapitalization(.never)
+                    .keyboardType(.URL)
+                    .autocorrectionDisabled()
+
+                    SecureField(
+                        "OAuth access token",
+                        text: $apiAccessToken
+                    )
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+
+                    Text(
+                        "The OAuth token stays in this app session and is never stored in the shared Shortcut. Pairing separately proves possession of this device's signing key."
+                    )
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+
+                    HStack {
+                        Button("Pair this device") {
+                            Task { await pairDevice() }
+                        }
+
+                        Button("Check") {
+                            Task { await checkDevice() }
+                        }
+
+                        Button("Run next") {
+                            Task { await runNextAction() }
+                        }
+                    }
+                    .disabled(apiBusy || apiBaseURLText.isEmpty || apiAccessToken.isEmpty)
+
+                    Button("Revoke this device", role: .destructive) {
+                        Task { await revokeDevice() }
+                    }
+                    .disabled(apiBusy || apiBaseURLText.isEmpty || apiAccessToken.isEmpty)
+
+                    Text(apiStatusMessage)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                 }
 
                 Section("KYN-W01 Media Intake") {
@@ -154,6 +205,101 @@ struct ContentView: View {
             statusMessage = "Destination selected locally."
         } catch {
             statusMessage = String(describing: error)
+        }
+    }
+
+    private func apiBaseURL() throws -> URL {
+        guard let url = URL(string: apiBaseURLText),
+              url.scheme?.lowercased() == "https",
+              url.host != nil,
+              url.user == nil,
+              url.password == nil else {
+            throw PairingClientError.invalidServiceURL
+        }
+        return url
+    }
+
+    private func pairDevice() async {
+        apiBusy = true
+        defer { apiBusy = false }
+
+        do {
+            let client = try KyntralPairingClient(
+                serviceBaseURL: apiBaseURL()
+            )
+            let completion = try await client.pair(
+                accessToken: apiAccessToken
+            )
+            apiStatusMessage =
+                "Paired \(completion.deviceId). Server action key pinned locally."
+        } catch {
+            apiStatusMessage = "Pairing failed: \(String(describing: error))"
+        }
+    }
+
+    private func checkDevice() async {
+        apiBusy = true
+        defer { apiBusy = false }
+
+        do {
+            let identity = try await DeviceKeyManager.shared.identity()
+            let client = try KyntralPairingClient(
+                serviceBaseURL: apiBaseURL()
+            )
+            let status = try await client.status(
+                deviceId: identity.deviceId,
+                accessToken: apiAccessToken
+            )
+            apiStatusMessage =
+                "Device \(status.deviceId): \(status.state)."
+        } catch {
+            apiStatusMessage = "Status check failed: \(String(describing: error))"
+        }
+    }
+
+    private func runNextAction() async {
+        apiBusy = true
+        defer { apiBusy = false }
+
+        do {
+            let client = try DeviceExecutionClient(
+                serviceBaseURL: apiBaseURL()
+            )
+            let result = try await client.processNext(
+                accessToken: apiAccessToken
+            )
+            switch result {
+            case .idle:
+                apiStatusMessage = "No authorized action is waiting."
+            case .receiptUploaded(let actionId):
+                apiStatusMessage =
+                    "Recovered and uploaded the verified receipt for \(actionId)."
+            case .executed(let actionId, let outcome):
+                apiStatusMessage =
+                    "Executed \(actionId) locally. Outcome: \(outcome)."
+            }
+        } catch {
+            apiStatusMessage = "Execution cycle failed: \(String(describing: error))"
+        }
+    }
+
+    private func revokeDevice() async {
+        apiBusy = true
+        defer { apiBusy = false }
+
+        do {
+            let identity = try await DeviceKeyManager.shared.identity()
+            let client = try KyntralPairingClient(
+                serviceBaseURL: apiBaseURL()
+            )
+            let result = try await client.revoke(
+                deviceId: identity.deviceId,
+                accessToken: apiAccessToken
+            )
+            apiStatusMessage =
+                "Device \(result.deviceId): \(result.state)."
+        } catch {
+            apiStatusMessage = "Revocation failed: \(String(describing: error))"
         }
     }
 
