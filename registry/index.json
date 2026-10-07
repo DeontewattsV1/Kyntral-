@@ -1,0 +1,28 @@
+{
+  "version": "kyntral.registry.v0",
+  "status": "prototype",
+  "entries": [
+    {
+      "capabilityId": "org.kyntral.media-intake",
+      "moduleVersion": "0.1.0",
+      "publisher": "kyntral_core",
+      "manifest": "../sdk/examples/media-intake.capability.json",
+      "tier": "Experimental",
+      "risk": "K2",
+      "execution": "device",
+      "cloudContentAccess": "none",
+      "conformance": ["CAP-001", "PRIV-001", "PRIV-002", "PRIV-003"]
+    },
+    {
+      "capabilityId": "org.kyntral.local-file-sort",
+      "moduleVersion": "0.1.0",
+      "publisher": "kyntral_core",
+      "manifest": "../sdk/examples/local-file-sort.capability.json",
+      "tier": "Experimental",
+      "risk": "K1",
+      "execution": "device",
+      "cloudContentAccess": "none",
+      "conformance": ["CAP-001", "PRIV-001"]
+    }
+  ]
+}
