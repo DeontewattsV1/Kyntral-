@@ -6,9 +6,28 @@ public struct LocalWorkflowDefinition: Codable, Sendable, Equatable {
     public let id: String
     public let capability: String
     public let risk: KyntralRiskClass
+    public let scopeId: String?
     public let resolverEndpoint: URL?
     public let destinationBookmark: Data?
     public let allowedResolverHosts: [String]
+
+    public init(
+        id: String,
+        capability: String,
+        risk: KyntralRiskClass,
+        scopeId: String? = nil,
+        resolverEndpoint: URL?,
+        destinationBookmark: Data?,
+        allowedResolverHosts: [String]
+    ) {
+        self.id = id
+        self.capability = capability
+        self.risk = risk
+        self.scopeId = scopeId
+        self.resolverEndpoint = resolverEndpoint
+        self.destinationBookmark = destinationBookmark
+        self.allowedResolverHosts = allowedResolverHosts
+    }
 }
 
 public struct LocalStandingGrant: Codable, Sendable, Equatable {
