@@ -3,9 +3,16 @@
 import {
   createMcpHandler,
   getOAuthProtectedResourceMetadataUrl,
-  requireBearerAuth
+  requireBearerAuth,
+  type AuthInfo
 } from "@modelcontextprotocol/server";
+import { assertOpaqueId } from "./domain.js";
 import { IntrospectionTokenVerifier } from "./oauth.js";
+import {
+  createPairingChallenge,
+  verifyAndConsumePairingProof,
+  type PairingProof
+} from "./pairing.js";
 import { KYNTRAL_SCOPES, createKyntralServer } from "./server.js";
 import { SqliteKyntralStore } from "./store.js";
 
@@ -16,11 +23,75 @@ export type KyntralHttpConfig = Readonly<{
   oauthClientId: string;
   oauthClientSecret: string;
   databasePath: string;
+  oauthFetch?: typeof fetch;
 }>;
+
+const MAX_DEVICE_REQUEST_BYTES = 64 * 1024;
 
 function requireProductionHttps(url: URL, field: string): void {
   if (url.protocol !== "https:") {
     throw new Error(field + " must use HTTPS");
+  }
+}
+
+function principalId(authInfo: AuthInfo): string {
+  const principal = authInfo.extra?.kyntralPrincipalId;
+  if (typeof principal !== "string") {
+    throw new Error("Authenticated Kyntral principal is required");
+  }
+  return assertOpaqueId(principal, "principalId");
+}
+
+function requireHttpScope(
+  authInfo: AuthInfo,
+  scope: string,
+  resourceMetadataUrl: string
+): Response | null {
+  if (authInfo.scopes.includes(scope)) return null;
+
+  return Response.json(
+    { error: "insufficient_scope" },
+    {
+      status: 403,
+      headers: {
+        "www-authenticate":
+          `Bearer error="insufficient_scope", scope="${scope}", ` +
+          `resource_metadata="${resourceMetadataUrl}"`
+      }
+    }
+  );
+}
+
+async function readBoundedJson<T>(request: Request): Promise<T> {
+  const contentLength = Number(request.headers.get("content-length") ?? "0");
+  if (Number.isFinite(contentLength) && contentLength > MAX_DEVICE_REQUEST_BYTES) {
+    throw new Error("request too large");
+  }
+
+  const text = await request.text();
+  if (new TextEncoder().encode(text).byteLength > MAX_DEVICE_REQUEST_BYTES) {
+    throw new Error("request too large");
+  }
+  return JSON.parse(text) as T;
+}
+
+function deviceIdFromPath(pathname: string): string | null {
+  const match = /^\/v1\/devices\/([^/]+)$/.exec(pathname);
+  if (!match) return null;
+  try {
+    return assertOpaqueId(decodeURIComponent(match[1]!), "deviceId");
+  } catch {
+    return null;
+  }
+}
+
+function revokedDeviceIdFromPath(pathname: string): string | null {
+  const match = /^\/v1\/devices\/([^/]+)\/revoke$/.exec(pathname);
+  if (!match) return null;
+  try {
+    return assertOpaqueId(decodeURIComponent(match[1]!), "deviceId");
+  } catch {
+    return null;
   }
 }
 
@@ -75,7 +146,8 @@ export function createKyntralHttpHandler(config: KyntralHttpConfig) {
       introspectionUrl: config.oauthIntrospectionUrl,
       clientId: config.oauthClientId,
       clientSecret: config.oauthClientSecret,
-      expectedResource: config.publicMcpUrl
+      expectedResource: config.publicMcpUrl,
+      fetchFn: config.oauthFetch
     }),
     expectedResource: config.publicMcpUrl,
     requiredScopes: [],
@@ -88,6 +160,10 @@ export function createKyntralHttpHandler(config: KyntralHttpConfig) {
     scopes_supported: Object.values(KYNTRAL_SCOPES),
     bearer_methods_supported: ["header"]
   };
+
+  async function authenticated(request: Request): Promise<AuthInfo | Response> {
+    return gate(request);
+  }
 
   return async function handleRequest(request: Request): Promise<Response> {
     const url = new URL(request.url);
@@ -115,11 +191,116 @@ export function createKyntralHttpHandler(config: KyntralHttpConfig) {
       });
     }
 
+    if (url.pathname === "/v1/pairing/challenge") {
+      if (request.method !== "POST") {
+        return new Response(null, { status: 405, headers: { allow: "POST" } });
+      }
+      const authInfo = await authenticated(request);
+      if (authInfo instanceof Response) return authInfo;
+      const scopeError = requireHttpScope(
+        authInfo,
+        KYNTRAL_SCOPES.pair,
+        resourceMetadataUrl
+      );
+      if (scopeError) return scopeError;
+
+      return Response.json(
+        createPairingChallenge(store, principalId(authInfo)),
+        { status: 201 }
+      );
+    }
+
+    if (url.pathname === "/v1/pairing/complete") {
+      if (request.method !== "POST") {
+        return new Response(null, { status: 405, headers: { allow: "POST" } });
+      }
+      const authInfo = await authenticated(request);
+      if (authInfo instanceof Response) return authInfo;
+      const scopeError = requireHttpScope(
+        authInfo,
+        KYNTRAL_SCOPES.pair,
+        resourceMetadataUrl
+      );
+      if (scopeError) return scopeError;
+
+      try {
+        const proof = await readBoundedJson<PairingProof>(request);
+        const identity = verifyAndConsumePairingProof({
+          store,
+          principalId: principalId(authInfo),
+          proof
+        });
+        return Response.json({
+          deviceId: identity.deviceId,
+          state: "paired",
+          signingKeyId: identity.signingPublicKey.kid,
+          keyAgreementKeyId: identity.keyAgreementPublicKey.kid
+        });
+      } catch {
+        return Response.json(
+          { error: "invalid_pairing_proof" },
+          { status: 400 }
+        );
+      }
+    }
+
+    const deviceId = deviceIdFromPath(url.pathname);
+    if (deviceId !== null) {
+      if (request.method !== "GET") {
+        return new Response(null, { status: 405, headers: { allow: "GET" } });
+      }
+      const authInfo = await authenticated(request);
+      if (authInfo instanceof Response) return authInfo;
+      const scopeError = requireHttpScope(
+        authInfo,
+        KYNTRAL_SCOPES.read,
+        resourceMetadataUrl
+      );
+      if (scopeError) return scopeError;
+
+      const device = store.getDevice(deviceId);
+      if (!device || device.principalId !== principalId(authInfo)) {
+        return Response.json({ error: "device_not_found" }, { status: 404 });
+      }
+      return Response.json({
+        deviceId,
+        state: device.revokedAt === null ? "paired" : "revoked",
+        executionAuthority: "device",
+        contentLocation: "device"
+      });
+    }
+
+    const revokeDeviceId = revokedDeviceIdFromPath(url.pathname);
+    if (revokeDeviceId !== null) {
+      if (request.method !== "POST") {
+        return new Response(null, { status: 405, headers: { allow: "POST" } });
+      }
+      const authInfo = await authenticated(request);
+      if (authInfo instanceof Response) return authInfo;
+      const scopeError = requireHttpScope(
+        authInfo,
+        KYNTRAL_SCOPES.revoke,
+        resourceMetadataUrl
+      );
+      if (scopeError) return scopeError;
+
+      const device = store.getDevice(revokeDeviceId);
+      if (!device || device.principalId !== principalId(authInfo)) {
+        return Response.json({ error: "device_not_found" }, { status: 404 });
+      }
+      const changed = store.revokeDevice(revokeDeviceId);
+      return Response.json({
+        deviceId: revokeDeviceId,
+        state: "revoked",
+        changed
+      });
+    }
+
     if (url.pathname !== "/mcp") {
       return new Response("Not Found", { status: 404 });
     }
 
-    const authInfo = await gate(request);
+    const authInfo = await authenticated(request);
     if (authInfo instanceof Response) return authInfo;
 
     return mcpHandler.fetch(request, { authInfo });
