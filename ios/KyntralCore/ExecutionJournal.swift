@@ -40,6 +40,20 @@ public actor ExecutionJournal {
         state.receipts[actionId]
     }
 
+    public func firstPendingReceipt() -> SignedExecutionReceipt? {
+        state.receipts.values.sorted {
+            if $0.completedAt == $1.completedAt {
+                return $0.receiptId < $1.receiptId
+            }
+            return $0.completedAt < $1.completedAt
+        }.first
+    }
+
+    public func remove(actionId: String) throws {
+        state.receipts.removeValue(forKey: actionId)
+        try persist()
+    }
+
     public func record(_ receipt: SignedExecutionReceipt) throws {
         if let existing = state.receipts[receipt.actionId] {
             guard existing == receipt else {
