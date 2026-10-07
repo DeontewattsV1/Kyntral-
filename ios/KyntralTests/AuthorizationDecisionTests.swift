@@ -50,6 +50,42 @@ final class AuthorizationDecisionTests: XCTestCase {
         )
     }
 
+    func testAuthorizationTrustStoreRejectsSilentRotation() async throws {
+        let trustStore = AuthorizationTrustStore(
+            service: "com.deontewatts.kyntral.test." + UUID().uuidString
+        )
+        let first = KyntralPublicJWK(
+            kty: "EC",
+            crv: "P-256",
+            x: "axfR8uEsQkf4vOblY6RA8ncDfYEt6zOg9KE5RdiYwpY",
+            y: "T-NC4v4af5uO5-tKfA-eFivOM1drMV7Oy7ZAaDe_UfU",
+            kid: "auth-test-01",
+            use: "sig",
+            alg: "ES256"
+        )
+        let rotated = KyntralPublicJWK(
+            kty: "EC",
+            crv: "P-256",
+            x: "fPJ7GI0DT36KUjgDBLUaw8CJaeJ38hs1pgtI_EdmmXg",
+            y: "B3dVENuO0EApPZrGn3Qw27p9reY86YIpngS3nSJ4c9E",
+            kid: "auth-test-02",
+            use: "sig",
+            alg: "ES256"
+        )
+
+        try await trustStore.pin(first)
+        do {
+            try await trustStore.pin(rotated)
+            XCTFail("Expected keyMismatch")
+        } catch AuthorizationTrustError.keyMismatch {
+            // Expected.
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+        XCTAssertEqual(try await trustStore.current(), first)
+        try await trustStore.resetForExplicitRepair()
+    }
+
     func testPairingClientPerformsChallengeThenSignedCompletion() async throws {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [PairingMockURLProtocol.self]
@@ -154,14 +190,21 @@ final class AuthorizationDecisionTests: XCTestCase {
             throw URLError(.unsupportedURL)
         }
 
+        let trustStore = AuthorizationTrustStore(
+            service: "com.deontewatts.kyntral.test." + UUID().uuidString
+        )
         let client = try KyntralPairingClient(
             serviceBaseURL: URL(string: "https://api.example.test/mcp")!,
-            session: session
+            session: session,
+            trustStore: trustStore
         )
         let completion = try await client.pair(accessToken: "oauth-test-token")
 
         XCTAssertEqual(requestCount, 2)
         XCTAssertEqual(completion.state, "paired")
         XCTAssertEqual(completion.deviceId, completedDeviceId)
+        let pinned = try await trustStore.current()
+        XCTAssertEqual(pinned, completion.authorizationSigningKey)
+        try await trustStore.resetForExplicitRepair()
     }
 }
