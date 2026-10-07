@@ -30,13 +30,15 @@ final class ExecutionJournalTests: XCTestCase {
         let reloaded = ExecutionJournal(stateURL: url)
         let stored = await reloaded.receipt(actionId: receipt.actionId)
         XCTAssertEqual(stored, receipt)
-        XCTAssertEqual(
-            await journal.firstPendingReceipt(),
-            receipt
-        )
+        let pending = await journal.firstPendingReceipt()
+        XCTAssertEqual(pending, receipt)
 
         try await journal.remove(actionId: receipt.actionId)
-        XCTAssertNil(await journal.firstPendingReceipt())
-        XCTAssertNil(await journal.receipt(actionId: receipt.actionId))
+        let pendingAfterRemove = await journal.firstPendingReceipt()
+        let storedAfterRemove = await journal.receipt(
+            actionId: receipt.actionId
+        )
+        XCTAssertNil(pendingAfterRemove)
+        XCTAssertNil(storedAfterRemove)
     }
 }
