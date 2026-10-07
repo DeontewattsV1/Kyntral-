@@ -241,6 +241,7 @@ public struct KyntralPairingClient {
               completion.state == "paired" else {
             throw PairingClientError.responseMismatch
         }
+        try await trustStore.pin(completion.authorizationSigningKey)
         return completion
     }
 
