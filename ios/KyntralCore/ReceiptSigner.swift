@@ -197,6 +197,7 @@ public struct TrustedActionContext: Sendable, Equatable {
 public struct VerifiedAction: Sendable, Equatable {
     public let action: LocalActionEnvelope
     public let actionHash: String
+    public let isResume: Bool
 }
 
 public enum ActionVerificationError: Error {
@@ -215,10 +216,23 @@ public enum ActionVerificationError: Error {
     case replay
 }
 
+private struct ActionReplayReservation: Codable {
+    let nonce: String
+    let idempotencyKey: String
+    let retainUntil: Date
+}
+
 private struct ActionReplayState: Codable {
     var nonces: [String: Date] = [:]
     var idempotencyKeys: [String: Date] = [:]
     var actionIds: [String: Date] = [:]
+    var reservations: [String: ActionReplayReservation]? = nil
+}
+
+public enum ActionReplayReservationResult: Sendable, Equatable {
+    case new
+    case resume
+    case conflict
 }
 
 public actor ActionReplayLedger {
@@ -248,6 +262,44 @@ public actor ActionReplayLedger {
         }
     }
 
+    public func reserve(
+        actionId: String,
+        nonce: String,
+        idempotencyKey: String,
+        retainUntil: Date,
+        now: Date = Date()
+    ) throws -> ActionReplayReservationResult {
+        prune(before: now)
+
+        if let existing = state.reservations?[actionId] {
+            guard existing.nonce == nonce,
+                  existing.idempotencyKey == idempotencyKey else {
+                return .conflict
+            }
+            return .resume
+        }
+
+        if state.actionIds[actionId] != nil ||
+            state.nonces[nonce] != nil ||
+            state.idempotencyKeys[idempotencyKey] != nil {
+            return .conflict
+        }
+
+        state.actionIds[actionId] = retainUntil
+        state.nonces[nonce] = retainUntil
+        state.idempotencyKeys[idempotencyKey] = retainUntil
+        if state.reservations == nil {
+            state.reservations = [:]
+        }
+        state.reservations?[actionId] = ActionReplayReservation(
+            nonce: nonce,
+            idempotencyKey: idempotencyKey,
+            retainUntil: retainUntil
+        )
+        try persist()
+        return .new
+    }
+
     public func consume(
         actionId: String,
         nonce: String,
@@ -255,24 +307,24 @@ public actor ActionReplayLedger {
         retainUntil: Date,
         now: Date = Date()
     ) throws -> Bool {
-        prune(before: now)
-        if state.actionIds[actionId] != nil ||
-            state.nonces[nonce] != nil ||
-            state.idempotencyKeys[idempotencyKey] != nil {
-            return false
-        }
-
-        state.actionIds[actionId] = retainUntil
-        state.nonces[nonce] = retainUntil
-        state.idempotencyKeys[idempotencyKey] = retainUntil
-        try persist()
-        return true
+        try reserve(
+            actionId: actionId,
+            nonce: nonce,
+            idempotencyKey: idempotencyKey,
+            retainUntil: retainUntil,
+            now: now
+        ) == .new
     }
 
     private func prune(before now: Date) {
         state.actionIds = state.actionIds.filter { $0.value >= now }
         state.nonces = state.nonces.filter { $0.value >= now }
         state.idempotencyKeys = state.idempotencyKeys.filter { $0.value >= now }
+        if let reservations = state.reservations {
+            state.reservations = reservations.filter {
+                $0.value.retainUntil >= now
+            }
+        }
     }
 
     private func persist() throws {
@@ -337,25 +389,28 @@ public struct ActionVerifier: Sendable {
         let decision = await registry.decision(
             workflowId: action.workflowId,
             capability: action.capability,
-            risk: action.risk
+            risk: action.risk,
+            scopeId: action.scopeId
         )
         guard decision.permitsExecution else {
             throw ActionVerificationError.authorizationRequired(decision)
         }
 
-        guard try await replayLedger.consume(
+        let reservation = try await replayLedger.reserve(
             actionId: action.actionId,
             nonce: action.nonce,
             idempotencyKey: action.idempotencyKey,
             retainUntil: retainUntil,
             now: now
-        ) else {
+        )
+        guard reservation != .conflict else {
             throw ActionVerificationError.replay
         }
 
         return VerifiedAction(
             action: action,
-            actionHash: try action.actionHash()
+            actionHash: try action.actionHash(),
+            isResume: reservation == .resume
         )
     }
 
