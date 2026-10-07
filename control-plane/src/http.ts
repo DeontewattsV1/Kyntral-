@@ -6,6 +6,10 @@ import {
   requireBearerAuth,
   type AuthInfo
 } from "@modelcontextprotocol/server";
+import {
+  Es256ActionSigner,
+  type P256PrivateJwk
+} from "./action.js";
 import { assertOpaqueId } from "./domain.js";
 import { IntrospectionTokenVerifier } from "./oauth.js";
 import {
@@ -22,6 +26,7 @@ export type KyntralHttpConfig = Readonly<{
   oauthIntrospectionUrl: URL;
   oauthClientId: string;
   oauthClientSecret: string;
+  actionSigner: Es256ActionSigner;
   databasePath: string;
   oauthFetch?: typeof fetch;
 }>;
@@ -32,6 +37,19 @@ function requireProductionHttps(url: URL, field: string): void {
   if (url.protocol !== "https:") {
     throw new Error(field + " must use HTTPS");
   }
+}
+
+function decodeActionSigningKey(value: string): P256PrivateJwk {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(Buffer.from(value, "base64url").toString("utf8"));
+  } catch {
+    throw new Error("KYNTRAL_ACTION_SIGNING_PRIVATE_JWK_B64 must be base64url JSON");
+  }
+  if (!parsed || typeof parsed !== "object") {
+    throw new Error("KYNTRAL_ACTION_SIGNING_PRIVATE_JWK_B64 must contain a JWK object");
+  }
+  return parsed as P256PrivateJwk;
 }
 
 function principalId(authInfo: AuthInfo): string {
@@ -103,7 +121,8 @@ export function loadHttpConfig(
     "KYNTRAL_OAUTH_ISSUER",
     "KYNTRAL_OAUTH_INTROSPECTION_URL",
     "KYNTRAL_OAUTH_CLIENT_ID",
-    "KYNTRAL_OAUTH_CLIENT_SECRET"
+    "KYNTRAL_OAUTH_CLIENT_SECRET",
+    "KYNTRAL_ACTION_SIGNING_PRIVATE_JWK_B64"
   ] as const;
 
   for (const name of required) {
@@ -128,6 +147,9 @@ export function loadHttpConfig(
     oauthIntrospectionUrl,
     oauthClientId: env.KYNTRAL_OAUTH_CLIENT_ID!,
     oauthClientSecret: env.KYNTRAL_OAUTH_CLIENT_SECRET!,
+    actionSigner: new Es256ActionSigner(
+      decodeActionSigningKey(env.KYNTRAL_ACTION_SIGNING_PRIVATE_JWK_B64!)
+    ),
     databasePath: env.KYNTRAL_DB_PATH ?? "./data/kyntral.db"
   };
 }
@@ -135,22 +157,23 @@ export function loadHttpConfig(
 export function createKyntralHttpHandler(config: KyntralHttpConfig) {
   const store = new SqliteKyntralStore(config.databasePath);
   const mcpHandler = createMcpHandler(() =>
-    createKyntralServer({ store })
+    createKyntralServer({
+      store,
+      actionSigner: config.actionSigner
+    })
   );
   const resourceMetadataUrl =
     getOAuthProtectedResourceMetadataUrl(config.publicMcpUrl);
 
-  const verifierOptions = {
-    issuer: config.oauthIssuer,
-    introspectionUrl: config.oauthIntrospectionUrl,
-    clientId: config.oauthClientId,
-    clientSecret: config.oauthClientSecret,
-    expectedResource: config.publicMcpUrl,
-    ...(config.oauthFetch ? { fetchFn: config.oauthFetch } : {})
-  };
-
   const gate = requireBearerAuth({
-    verifier: new IntrospectionTokenVerifier(verifierOptions),
+    verifier: new IntrospectionTokenVerifier({
+      issuer: config.oauthIssuer,
+      introspectionUrl: config.oauthIntrospectionUrl,
+      clientId: config.oauthClientId,
+      clientSecret: config.oauthClientSecret,
+      expectedResource: config.publicMcpUrl,
+      fetchFn: config.oauthFetch
+    }),
     expectedResource: config.publicMcpUrl,
     requiredScopes: [],
     resourceMetadataUrl
