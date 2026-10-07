@@ -84,6 +84,7 @@ public actor LocalWorkflowInbox {
                 ? "x.com"
                 : "x.com"
             parts?.fragment = nil
+            parts?.query = nil
             let value = parts?.url?.absoluteString ?? url.absoluteString
             if seen.insert(value).inserted {
                 normalized.append(value)
