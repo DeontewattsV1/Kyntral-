@@ -120,6 +120,7 @@ function configForScopes(scopes: string[]): KyntralHttpConfig {
     oauthIntrospectionUrl: new URL("https://identity.example.test/introspect"),
     oauthClientId: "resource-server",
     oauthClientSecret: "test-secret",
+    deviceOAuthClientId: "ios-client",
     actionSigner: new Es256ActionSigner(signingJwk()),
     databasePath: ":memory:",
     oauthFetch
@@ -143,6 +144,7 @@ function productionEnv(): NodeJS.ProcessEnv {
     KYNTRAL_OAUTH_INTROSPECTION_URL: "https://identity.example.test/introspect",
     KYNTRAL_OAUTH_CLIENT_ID: "resource-server",
     KYNTRAL_OAUTH_CLIENT_SECRET: "test-secret",
+    KYNTRAL_DEVICE_OAUTH_CLIENT_ID: "ios-client",
     KYNTRAL_ACTION_SIGNING_PRIVATE_JWK_B64: signingKeyB64(),
     KYNTRAL_DB_PATH: ":memory:"
   };
@@ -181,6 +183,33 @@ describe("OAuth-bound device HTTP surface", () => {
     expect(String(body.principalId)).toMatch(/^usr_[A-Za-z0-9_-]+$/);
     expect(String(body.nonce)).toMatch(/^[A-Za-z0-9_-]{43}$/);
     expect(JSON.stringify(body)).not.toContain("device-owner-123");
+  });
+
+  it("rejects device HTTP access from a non-iOS OAuth client", async () => {
+    const base = configForScopes(["kyntral.pair"]);
+    const foreignFetch = vi.fn(async () =>
+      Response.json({
+        active: true,
+        client_id: "openai-client",
+        scope: "kyntral.pair",
+        exp: Math.floor(Date.now() / 1000) + 300,
+        sub: "device-owner-123",
+        aud: resource.href,
+        iss: issuer.href
+      })
+    ) as unknown as typeof fetch;
+    const handler = createKyntralHttpHandler({
+      ...base,
+      oauthFetch: foreignFetch
+    });
+
+    const response = await handler(request("/v1/pairing/challenge", {
+      method: "POST"
+    }));
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({
+      error: "device_client_required"
+    });
   });
 
   it("rejects pairing when the bearer token lacks kyntral.pair", async () => {
