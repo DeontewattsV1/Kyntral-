@@ -28,6 +28,7 @@ export type KyntralHttpConfig = Readonly<{
   oauthIntrospectionUrl: URL;
   oauthClientId: string;
   oauthClientSecret: string;
+  deviceOAuthClientId: string;
   actionSigner: Es256ActionSigner;
   databasePath: string;
   oauthFetch?: typeof fetch;
@@ -146,6 +147,7 @@ export function loadHttpConfig(
     "KYNTRAL_OAUTH_INTROSPECTION_URL",
     "KYNTRAL_OAUTH_CLIENT_ID",
     "KYNTRAL_OAUTH_CLIENT_SECRET",
+    "KYNTRAL_DEVICE_OAUTH_CLIENT_ID",
     "KYNTRAL_ACTION_SIGNING_PRIVATE_JWK_B64"
   ] as const;
 
@@ -171,6 +173,7 @@ export function loadHttpConfig(
     oauthIntrospectionUrl,
     oauthClientId: env.KYNTRAL_OAUTH_CLIENT_ID!,
     oauthClientSecret: env.KYNTRAL_OAUTH_CLIENT_SECRET!,
+    deviceOAuthClientId: env.KYNTRAL_DEVICE_OAUTH_CLIENT_ID!,
     actionSigner: new Es256ActionSigner(
       decodeActionSigningKey(env.KYNTRAL_ACTION_SIGNING_PRIVATE_JWK_B64!)
     ),
@@ -217,6 +220,14 @@ export function createKyntralHttpHandler(config: KyntralHttpConfig) {
     return gate(request);
   }
 
+  function requireDeviceOAuthClient(authInfo: AuthInfo): Response | null {
+    if (authInfo.clientId === config.deviceOAuthClientId) return null;
+    return Response.json(
+      { error: "device_client_required" },
+      { status: 403 }
+    );
+  }
+
   return async function handleRequest(request: Request): Promise<Response> {
     const url = new URL(request.url);
 
@@ -255,6 +266,8 @@ export function createKyntralHttpHandler(config: KyntralHttpConfig) {
         resourceMetadataUrl
       );
       if (scopeError) return scopeError;
+      const clientError = requireDeviceOAuthClient(authInfo);
+      if (clientError) return clientError;
 
       return Response.json(
         createPairingChallenge(store, principalId(authInfo)),
@@ -274,6 +287,8 @@ export function createKyntralHttpHandler(config: KyntralHttpConfig) {
         resourceMetadataUrl
       );
       if (scopeError) return scopeError;
+      const clientError = requireDeviceOAuthClient(authInfo);
+      if (clientError) return clientError;
 
       try {
         const proof = await readBoundedJson<PairingProof>(request);
@@ -310,6 +325,8 @@ export function createKyntralHttpHandler(config: KyntralHttpConfig) {
         resourceMetadataUrl
       );
       if (scopeError) return scopeError;
+      const clientError = requireDeviceOAuthClient(authInfo);
+      if (clientError) return clientError;
 
       const device = store.getDevice(actionDeviceId);
       if (!device || device.principalId !== principalId(authInfo)) {
@@ -344,6 +361,8 @@ export function createKyntralHttpHandler(config: KyntralHttpConfig) {
         resourceMetadataUrl
       );
       if (scopeError) return scopeError;
+      const clientError = requireDeviceOAuthClient(authInfo);
+      if (clientError) return clientError;
 
       const device = store.getDevice(receiptDeviceId);
       if (!device || device.principalId !== principalId(authInfo)) {
@@ -392,6 +411,8 @@ export function createKyntralHttpHandler(config: KyntralHttpConfig) {
         resourceMetadataUrl
       );
       if (scopeError) return scopeError;
+      const clientError = requireDeviceOAuthClient(authInfo);
+      if (clientError) return clientError;
 
       const device = store.getDevice(deviceId);
       if (!device || device.principalId !== principalId(authInfo)) {
@@ -418,6 +439,8 @@ export function createKyntralHttpHandler(config: KyntralHttpConfig) {
         resourceMetadataUrl
       );
       if (scopeError) return scopeError;
+      const clientError = requireDeviceOAuthClient(authInfo);
+      if (clientError) return clientError;
 
       const device = store.getDevice(revokeDeviceId);
       if (!device || device.principalId !== principalId(authInfo)) {
