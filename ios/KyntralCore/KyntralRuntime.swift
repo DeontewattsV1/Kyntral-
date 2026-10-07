@@ -55,6 +55,7 @@ public actor KyntralRuntime {
         do {
             let result = try await runMediaIntake(
                 workflowId: action.workflowId,
+                scopeId: action.scopeId,
                 urls: urls
             )
             if result.failed == 0 {
@@ -67,6 +68,7 @@ public actor KyntralRuntime {
     }
 
     public func configureMediaIntake(
+        scopeId: String? = nil,
         endpoint: URL,
         destinationBookmark: Data,
         standingGrantAllowed: Bool
@@ -81,6 +83,7 @@ public actor KyntralRuntime {
             id: "wf_media_intake",
             capability: "workflow.execute",
             risk: .k2,
+            scopeId: scopeId,
             resolverEndpoint: endpoint,
             destinationBookmark: destinationBookmark,
             allowedResolverHosts: [host]
@@ -88,6 +91,7 @@ public actor KyntralRuntime {
         try await registry.putWorkflow(workflow)
         try await registry.putStandingGrant(
             LocalStandingGrant(
+                scopeId: scopeId,
                 workflowId: workflow.id,
                 capability: workflow.capability,
                 risk: workflow.risk,
@@ -99,22 +103,32 @@ public actor KyntralRuntime {
     }
 
     public func workflowState(
-        id: String
+        id: String,
+        scopeId: String? = nil
     ) async -> (workflow: LocalWorkflowDefinition?, decision: AuthorizationDecision) {
         let workflow = await registry.workflow(id: id)
         guard let workflow else { return (nil, .unknown) }
         let decision = await registry.decision(
             workflowId: id,
-            capability: workflow.capability
+            capability: workflow.capability,
+            scopeId: scopeId
         )
         return (workflow, decision)
     }
 
-    public func runMediaIntake(workflowId: String, urls: [URL]) async throws -> MediaIntakeResult {
+    public func runMediaIntake(
+        workflowId: String,
+        scopeId: String? = nil,
+        urls: [URL]
+    ) async throws -> MediaIntakeResult {
         guard let workflow = await registry.workflow(id: workflowId) else {
             throw KyntralRuntimeError.unknownWorkflow
         }
-        let decision = await registry.decision(workflowId: workflowId, capability: workflow.capability)
+        let decision = await registry.decision(
+            workflowId: workflowId,
+            capability: workflow.capability,
+            scopeId: scopeId
+        )
         guard decision.permitsExecution else {
             throw KyntralRuntimeError.authorizationRequired(decision)
         }
