@@ -8,6 +8,7 @@ public enum KyntralRuntimeError: Error {
     case workflowNotConfigured
     case invalidDestinationBookmark
     case invalidResolverConfiguration
+    case invalidScopeId
     case noLocalWorkflowInput
 }
 
@@ -73,6 +74,15 @@ public actor KyntralRuntime {
         destinationBookmark: Data,
         standingGrantAllowed: Bool
     ) async throws {
+        if let scopeId {
+            guard scopeId.range(
+                of: "^[A-Za-z][A-Za-z0-9_-]{2,127}$",
+                options: .regularExpression
+            ) != nil else {
+                throw KyntralRuntimeError.invalidScopeId
+            }
+        }
+
         guard endpoint.scheme?.lowercased() == "https",
               let host = endpoint.host?.lowercased(),
               !host.isEmpty else {
