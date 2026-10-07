@@ -132,8 +132,8 @@ final class AuthorizationDecisionTests: XCTestCase {
                     "authorizationSigningKey": [
                         "kty": "EC",
                         "crv": "P-256",
-                        "x": String(repeating: "A", count: 43),
-                        "y": String(repeating: "B", count: 43),
+                        "x": "axfR8uEsQkf4vOblY6RA8ncDfYEt6zOg9KE5RdiYwpY",
+                        "y": "T-NC4v4af5uO5-tKfA-eFivOM1drMV7Oy7ZAaDe_UfU",
                         "kid": "auth-test-01",
                         "use": "sig",
                         "alg": "ES256"
