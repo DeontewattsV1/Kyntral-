@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 
+import CryptoKit
 import Foundation
+import Security
 
 public struct DeviceActionDelivery: Codable, Sendable {
     public let action: LocalActionEnvelope
@@ -11,11 +13,123 @@ public struct ReceiptAcceptance: Codable, Sendable {
     public let verified: Bool
 }
 
+public struct DeviceRequestSignatureProof: Codable, Sendable, Equatable {
+    public let keyId: String
+    public let algorithm: String
+    public let signature: String
+}
+
+public struct KyntralDeviceRequestProof: Codable, Sendable, Equatable {
+    public let version: String
+    public let deviceId: String
+    public let method: String
+    public let path: String
+    public let bodyHash: String
+    public let nonce: String
+    public let issuedAt: String
+    public let expiresAt: String
+    public let proof: DeviceRequestSignatureProof
+
+    var canonicalUnsignedValue: KCJValue {
+        .object([
+            "version": .string(version),
+            "deviceId": .string(deviceId),
+            "method": .string(method),
+            "path": .string(path),
+            "bodyHash": .string(bodyHash),
+            "nonce": .string(nonce),
+            "issuedAt": .string(issuedAt),
+            "expiresAt": .string(expiresAt)
+        ])
+    }
+}
+
+public struct DeviceRequestSigner: Sendable {
+    public static let headerName = "X-Kyntral-Device-Proof"
+    public static let maximumLifetime: TimeInterval = 60
+
+    private let keyManager: DeviceKeyManager
+
+    public init(keyManager: DeviceKeyManager = .shared) {
+        self.keyManager = keyManager
+    }
+
+    public func headerValue(
+        deviceId: String,
+        method: String,
+        path: String,
+        body: Data,
+        now: Date = Date()
+    ) async throws -> String {
+        var nonce = Data(count: 32)
+        let status = nonce.withUnsafeMutableBytes { buffer in
+            SecRandomCopyBytes(
+                kSecRandomDefault,
+                buffer.count,
+                buffer.baseAddress!
+            )
+        }
+        guard status == errSecSuccess else {
+            throw DeviceExecutionClientError.deviceProofCreation
+        }
+
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [
+            .withInternetDateTime,
+            .withFractionalSeconds
+        ]
+        let expiresAt = now.addingTimeInterval(Self.maximumLifetime)
+        let unsigned = KyntralDeviceRequestProof(
+            version: "kyntral.device-request.v1",
+            deviceId: deviceId,
+            method: method,
+            path: path,
+            bodyHash: Self.sha256(body),
+            nonce: nonce.base64URLString,
+            issuedAt: formatter.string(from: now),
+            expiresAt: formatter.string(from: expiresAt),
+            proof: DeviceRequestSignatureProof(
+                keyId: try await keyManager.signingKeyID(),
+                algorithm: "ES256",
+                signature: ""
+            )
+        )
+        let preimage = try KCJCanonicalizer.signingPreimage(
+            purpose: "device-request",
+            payload: unsigned.canonicalUnsignedValue
+        )
+        let signature = try await keyManager.sign(preimage).base64URLString
+        let signed = KyntralDeviceRequestProof(
+            version: unsigned.version,
+            deviceId: unsigned.deviceId,
+            method: unsigned.method,
+            path: unsigned.path,
+            bodyHash: unsigned.bodyHash,
+            nonce: unsigned.nonce,
+            issuedAt: unsigned.issuedAt,
+            expiresAt: unsigned.expiresAt,
+            proof: DeviceRequestSignatureProof(
+                keyId: unsigned.proof.keyId,
+                algorithm: "ES256",
+                signature: signature
+            )
+        )
+        return try JSONEncoder().encode(signed).base64URLString
+    }
+
+    public static func sha256(_ data: Data) -> String {
+        "sha256:" + SHA256.hash(data: data)
+            .map { String(format: "%02x", $0) }
+            .joined()
+    }
+}
+
 public enum DeviceExecutionClientError: Error {
     case invalidServiceURL
     case invalidAccessToken
     case invalidDeviceId
     case noTrustedAuthorizationKey
+    case deviceProofCreation
     case deviceMismatch
     case unexpectedResponse(Int)
     case receiptNotVerified
@@ -36,6 +150,7 @@ public struct DeviceExecutionClient: Sendable {
     private let journal: ExecutionJournal
     private let keyManager: DeviceKeyManager
     private let trustStore: AuthorizationTrustStore
+    private let requestSigner: DeviceRequestSigner
 
     public init(
         serviceBaseURL: URL,
@@ -45,7 +160,8 @@ public struct DeviceExecutionClient: Sendable {
         receiptSigner: ReceiptSigner = ReceiptSigner(),
         journal: ExecutionJournal = .shared,
         keyManager: DeviceKeyManager = .shared,
-        trustStore: AuthorizationTrustStore = .shared
+        trustStore: AuthorizationTrustStore = .shared,
+        requestSigner: DeviceRequestSigner = DeviceRequestSigner()
     ) throws {
         guard serviceBaseURL.scheme?.lowercased() == "https",
               serviceBaseURL.host != nil,
@@ -60,6 +176,7 @@ public struct DeviceExecutionClient: Sendable {
         self.journal = journal
         self.keyManager = keyManager
         self.trustStore = trustStore
+        self.requestSigner = requestSigner
 
         if let session {
             self.session = session
@@ -106,6 +223,15 @@ public struct DeviceExecutionClient: Sendable {
             forHTTPHeaderField: "Authorization"
         )
         request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue(
+            try await requestSigner.headerValue(
+                deviceId: identity.deviceId,
+                method: "GET",
+                path: endpoint.path,
+                body: Data()
+            ),
+            forHTTPHeaderField: DeviceRequestSigner.headerName
+        )
         request.cachePolicy = .reloadIgnoringLocalCacheData
 
         let (data, response) = try await session.data(for: request)
@@ -214,7 +340,17 @@ public struct DeviceExecutionClient: Sendable {
             "application/json",
             forHTTPHeaderField: "Content-Type"
         )
-        request.httpBody = try JSONEncoder().encode(receipt)
+        let body = try JSONEncoder().encode(receipt)
+        request.httpBody = body
+        request.setValue(
+            try await requestSigner.headerValue(
+                deviceId: deviceId,
+                method: "POST",
+                path: endpoint.path,
+                body: body
+            ),
+            forHTTPHeaderField: DeviceRequestSigner.headerName
+        )
 
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse,
