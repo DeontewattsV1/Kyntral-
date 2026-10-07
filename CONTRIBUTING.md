@@ -38,7 +38,7 @@ commercialize, and relicense contributed material where required by the mixed
 licensing model.
 
 **Until that workflow is finalized, maintainers should not merge external code contributions.**
-Design discussion and review are welcome.
+Design discussion and review are welcome. See `docs/contributor-license-workflow.md` for the activation gate and merge rule.
 
 ## Developer extensions
 
