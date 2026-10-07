@@ -84,3 +84,46 @@ destination filenames
 ## Shared-link lifecycle
 
 If the Shortcut changes materially, treat the shared-link version as a release artifact. Re-test the onboarding path and update this document if a new iCloud Shortcut link replaces the current one.
+
+
+## Link the personal device through the User API
+
+The current iOS RC exposes pairing controls in the Kyntral app. The shared Shortcut does **not** carry the User API token.
+
+On the same iPhone or iPad:
+
+1. Install the shared Shortcut.
+2. Open Kyntral.
+3. In **Personal Device API**, enter the production Kyntral HTTPS API base URL.
+4. Obtain an OAuth access token through the approved Kyntral authorization flow.
+5. Enter that token into the app session.
+6. Tap **Pair this device**. Kyntral generates/loads the local signing and key-agreement identities, obtains a one-time pairing challenge, signs it locally, and pins the server action-signing key returned by the pairing response.
+7. Use **Check** to verify paired status.
+8. Configure KYN-W01 and its exact local standing grant.
+9. The Shortcut stages media inputs locally.
+10. Use **Run next** (or the later background delivery path) to retrieve and execute an authorized signed ActionEnvelope.
+11. Use **Revoke this device** to disable future authorization for that paired device.
+
+The iOS device client needs narrowly separated scopes appropriate to the operation:
+
+```text
+kyntral.pair
+kyntral.read
+kyntral.device.execute
+kyntral.receipt.submit
+kyntral.revoke
+```
+
+The AI/MCP client does not receive these merely because the iOS device has them. MCP proposal scopes and device execution scopes remain distinct.
+
+## Token boundary
+
+The OAuth token is intentionally **not** embedded in:
+
+- the iCloud Shortcut;
+- a Note;
+- a KYN-W01 workflow definition;
+- the cloud ActionEnvelope;
+- the local URL inbox.
+
+The current RC UI keeps the token in app-session state only. A production iOS authentication UX should obtain and refresh tokens through the final OAuth provider rather than asking users to manually paste long-lived bearer tokens.
