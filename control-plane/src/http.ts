@@ -140,15 +140,17 @@ export function createKyntralHttpHandler(config: KyntralHttpConfig) {
   const resourceMetadataUrl =
     getOAuthProtectedResourceMetadataUrl(config.publicMcpUrl);
 
+  const verifierOptions = {
+    issuer: config.oauthIssuer,
+    introspectionUrl: config.oauthIntrospectionUrl,
+    clientId: config.oauthClientId,
+    clientSecret: config.oauthClientSecret,
+    expectedResource: config.publicMcpUrl,
+    ...(config.oauthFetch ? { fetchFn: config.oauthFetch } : {})
+  };
+
   const gate = requireBearerAuth({
-    verifier: new IntrospectionTokenVerifier({
-      issuer: config.oauthIssuer,
-      introspectionUrl: config.oauthIntrospectionUrl,
-      clientId: config.oauthClientId,
-      clientSecret: config.oauthClientSecret,
-      expectedResource: config.publicMcpUrl,
-      fetchFn: config.oauthFetch
-    }),
+    verifier: new IntrospectionTokenVerifier(verifierOptions),
     expectedResource: config.publicMcpUrl,
     requiredScopes: [],
     resourceMetadataUrl
