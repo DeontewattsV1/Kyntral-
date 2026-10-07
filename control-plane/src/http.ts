@@ -10,6 +10,7 @@ import {
   Es256ActionSigner,
   type P256PrivateJwk
 } from "./action.js";
+import type { ExecutionReceipt } from "./crypto.js";
 import { assertOpaqueId } from "./domain.js";
 import { IntrospectionTokenVerifier } from "./oauth.js";
 import {
@@ -17,6 +18,7 @@ import {
   verifyAndConsumePairingProof,
   type PairingProof
 } from "./pairing.js";
+import { verifyAndStoreReceipt } from "./receipt.js";
 import { KYNTRAL_SCOPES, createKyntralServer } from "./server.js";
 import { SqliteKyntralStore } from "./store.js";
 
@@ -105,6 +107,26 @@ function deviceIdFromPath(pathname: string): string | null {
 
 function revokedDeviceIdFromPath(pathname: string): string | null {
   const match = /^\/v1\/devices\/([^/]+)\/revoke$/.exec(pathname);
+  if (!match) return null;
+  try {
+    return assertOpaqueId(decodeURIComponent(match[1]!), "deviceId");
+  } catch {
+    return null;
+  }
+}
+
+function actionDeviceIdFromPath(pathname: string): string | null {
+  const match = /^\/v1\/devices\/([^/]+)\/actions\/next$/.exec(pathname);
+  if (!match) return null;
+  try {
+    return assertOpaqueId(decodeURIComponent(match[1]!), "deviceId");
+  } catch {
+    return null;
+  }
+}
+
+function receiptDeviceIdFromPath(pathname: string): string | null {
+  const match = /^\/v1\/devices\/([^/]+)\/receipts$/.exec(pathname);
   if (!match) return null;
   try {
     return assertOpaqueId(decodeURIComponent(match[1]!), "deviceId");
@@ -261,11 +283,93 @@ export function createKyntralHttpHandler(config: KyntralHttpConfig) {
           deviceId: identity.deviceId,
           state: "paired",
           signingKeyId: identity.signingPublicKey.kid,
-          keyAgreementKeyId: identity.keyAgreementPublicKey.kid
+          keyAgreementKeyId: identity.keyAgreementPublicKey.kid,
+          authorizationSigningKey: config.actionSigner.publicKey
         });
       } catch {
         return Response.json(
           { error: "invalid_pairing_proof" },
+          { status: 400 }
+        );
+      }
+    }
+
+    const actionDeviceId = actionDeviceIdFromPath(url.pathname);
+    if (actionDeviceId !== null) {
+      if (request.method !== "GET") {
+        return new Response(null, { status: 405, headers: { allow: "GET" } });
+      }
+      const authInfo = await authenticated(request);
+      if (authInfo instanceof Response) return authInfo;
+      const scopeError = requireHttpScope(
+        authInfo,
+        KYNTRAL_SCOPES.deviceExecute,
+        resourceMetadataUrl
+      );
+      if (scopeError) return scopeError;
+
+      const device = store.getDevice(actionDeviceId);
+      if (!device || device.principalId !== principalId(authInfo)) {
+        return Response.json({ error: "device_not_found" }, { status: 404 });
+      }
+      if (device.revokedAt !== null) {
+        return Response.json({ error: "device_revoked" }, { status: 403 });
+      }
+
+      const delivery = store.claimNextAction(actionDeviceId);
+      if (!delivery) return new Response(null, { status: 204 });
+
+      return Response.json({
+        action: delivery.signedAction.action
+      }, {
+        headers: {
+          "cache-control": "no-store"
+        }
+      });
+    }
+
+    const receiptDeviceId = receiptDeviceIdFromPath(url.pathname);
+    if (receiptDeviceId !== null) {
+      if (request.method !== "POST") {
+        return new Response(null, { status: 405, headers: { allow: "POST" } });
+      }
+      const authInfo = await authenticated(request);
+      if (authInfo instanceof Response) return authInfo;
+      const scopeError = requireHttpScope(
+        authInfo,
+        KYNTRAL_SCOPES.receiptSubmit,
+        resourceMetadataUrl
+      );
+      if (scopeError) return scopeError;
+
+      const device = store.getDevice(receiptDeviceId);
+      if (!device || device.principalId !== principalId(authInfo)) {
+        return Response.json({ error: "device_not_found" }, { status: 404 });
+      }
+
+      try {
+        const receipt = await readBoundedJson<ExecutionReceipt>(request);
+        if (receipt.deviceId !== receiptDeviceId) {
+          throw new Error("receipt device mismatch");
+        }
+        const result = verifyAndStoreReceipt({
+          store,
+          principalId: principalId(authInfo),
+          receipt
+        });
+        return Response.json({
+          status: result.status,
+          verified: true,
+          receipt: result.receipt
+        }, {
+          status: result.status === "accepted" ? 201 : 200,
+          headers: {
+            "cache-control": "no-store"
+          }
+        });
+      } catch {
+        return Response.json(
+          { error: "receipt_not_accepted" },
           { status: 400 }
         );
       }
