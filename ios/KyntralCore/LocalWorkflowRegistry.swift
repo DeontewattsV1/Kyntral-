@@ -97,7 +97,7 @@ public actor LocalWorkflowRegistry {
         if let risk, grant.risk != risk {
             return .denied
         }
-        if let scopeId, grant.scopeId != scopeId {
+        if grant.scopeId != scopeId {
             return .denied
         }
         guard grant.allowed else { return .denied }
