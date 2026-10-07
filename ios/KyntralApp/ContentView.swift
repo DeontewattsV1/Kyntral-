@@ -97,19 +97,23 @@ struct ContentView: View {
     private func loadLocalState() async {
         do {
             deviceID = try await DeviceKeyManager.shared.identity().deviceId
-            let state = await KyntralRuntime.shared.workflowState(
-                id: "wf_media_intake",
-                scopeId: scopeIdText.isEmpty ? nil : scopeIdText
+            let initial = await KyntralRuntime.shared.workflowState(
+                id: "wf_media_intake"
             )
-            if let workflow = state.workflow {
+            if let workflow = initial.workflow {
                 scopeIdText = workflow.scopeId ?? ""
                 endpointText = workflow.resolverEndpoint?.absoluteString ?? ""
                 destinationBookmark = workflow.destinationBookmark
-                standingGrantAllowed = state.decision == .allowed
+                let scoped = await KyntralRuntime.shared.workflowState(
+                    id: "wf_media_intake",
+                    scopeId: workflow.scopeId
+                )
+                standingGrantAllowed = scoped.decision == .allowed
                 destinationName = workflow.destinationBookmark == nil
                     ? "Not selected"
                     : "Previously selected folder"
-                statusMessage = "Saved locally. Authorization: \(state.decision.rawValue)."
+                statusMessage =
+                    "Saved locally. Authorization: \(scoped.decision.rawValue)."
             }
         } catch {
             deviceID = "Local device identity unavailable"
@@ -153,7 +157,8 @@ struct ContentView: View {
                 standingGrantAllowed: standingGrantAllowed
             )
             let state = await KyntralRuntime.shared.workflowState(
-                id: "wf_media_intake"
+                id: "wf_media_intake",
+                scopeId: scopeIdText
             )
             statusMessage = "Saved locally. Authorization: \(state.decision.rawValue)."
         } catch {
