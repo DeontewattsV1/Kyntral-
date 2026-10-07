@@ -40,11 +40,17 @@ export type StoredSignedAction = Readonly<{
   actionHash: string;
 }>;
 
+export type ClaimedDeviceAction = Readonly<{
+  job: CloudJob;
+  signedAction: StoredSignedAction;
+}>;
+
 export interface KyntralStore {
   putJob(job: CloudJob, now?: Date): void;
   putAuthorizedJob(job: CloudJob, action: StoredSignedAction, now?: Date): void;
   getJob(actionId: string): CloudJob | null;
   getSignedAction(actionId: string): StoredSignedAction | null;
+  claimNextAction(deviceId: string, now?: Date): ClaimedDeviceAction | null;
   updateJobState(actionId: string, state: CloudJob["state"]): CloudJob | null;
   putReceipt(receipt: CloudReceipt): void;
   putVerifiedReceipt(receipt: CloudReceipt, state: CloudJob["state"]): void;
@@ -160,6 +166,52 @@ export class SqliteKyntralStore implements KyntralStore {
       authorizationKey: JSON.parse(String(row.authorization_key_json)) as P256PublicJwk,
       actionHash: String(row.action_hash)
     };
+  }
+
+  claimNextAction(
+    deviceId: string,
+    now = new Date()
+  ): ClaimedDeviceAction | null {
+    const nowIso = now.toISOString();
+    this.#db.exec("BEGIN IMMEDIATE");
+    try {
+      let row = this.#db.prepare(
+        "SELECT action_id FROM jobs WHERE device_id = ? AND state = 'executing' AND expires_at >= ? ORDER BY created_at ASC LIMIT 1"
+      ).get(deviceId, nowIso) as Row | undefined;
+
+      if (!row) {
+        row = this.#db.prepare(
+          "SELECT action_id FROM jobs WHERE device_id = ? AND state = 'queued' AND expires_at >= ? ORDER BY created_at ASC LIMIT 1"
+        ).get(deviceId, nowIso) as Row | undefined;
+
+        if (row) {
+          const result = this.#db.prepare(
+            "UPDATE jobs SET state = 'executing' WHERE action_id = ? AND state = 'queued'"
+          ).run(String(row.action_id));
+          if (Number(result.changes) !== 1) {
+            throw new Error("device action claim lost");
+          }
+        }
+      }
+
+      if (!row) {
+        this.#db.exec("COMMIT");
+        return null;
+      }
+
+      const actionId = String(row.action_id);
+      const job = this.getJob(actionId);
+      const signedAction = this.getSignedAction(actionId);
+      if (!job || !signedAction) {
+        throw new Error("claimed action is incomplete");
+      }
+
+      this.#db.exec("COMMIT");
+      return { job, signedAction };
+    } catch (error) {
+      this.#db.exec("ROLLBACK");
+      throw error;
+    }
   }
 
   updateJobState(actionId: string, state: CloudJob["state"]): CloudJob | null {
