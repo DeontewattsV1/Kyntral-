@@ -1,0 +1,91 @@
+// SPDX-License-Identifier: BUSL-1.1
+
+import Foundation
+
+public struct LocalWorkflowDefinition: Codable, Sendable, Equatable {
+    public let id: String
+    public let capability: String
+    public let risk: KyntralRiskClass
+    public let resolverEndpoint: URL?
+    public let destinationBookmark: Data?
+    public let allowedResolverHosts: [String]
+}
+
+public struct LocalStandingGrant: Codable, Sendable, Equatable {
+    public let workflowId: String
+    public let capability: String
+    public let risk: KyntralRiskClass
+    public let allowed: Bool
+    public let issuedAt: Date
+    public let expiresAt: Date?
+}
+
+private struct LocalRegistryState: Codable {
+    var workflows: [String: LocalWorkflowDefinition] = [:]
+    var grants: [String: LocalStandingGrant] = [:]
+}
+
+public actor LocalWorkflowRegistry {
+    public static let shared = LocalWorkflowRegistry()
+
+    private let stateURL: URL
+    private var state: LocalRegistryState
+
+    public init(stateURL: URL? = nil) {
+        let root = FileManager.default.urls(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask
+        ).first!
+        let directory = root.appendingPathComponent("Kyntral", isDirectory: true)
+        try? FileManager.default.createDirectory(
+            at: directory,
+            withIntermediateDirectories: true
+        )
+        let resolvedURL = stateURL ?? directory.appendingPathComponent("local-registry.json")
+        self.stateURL = resolvedURL
+        if let data = try? Data(contentsOf: resolvedURL),
+           let decoded = try? JSONDecoder().decode(LocalRegistryState.self, from: data) {
+            self.state = decoded
+        } else {
+            self.state = LocalRegistryState()
+        }
+    }
+
+    public func putWorkflow(_ workflow: LocalWorkflowDefinition) throws {
+        state.workflows[workflow.id] = workflow
+        try persist()
+    }
+
+    public func workflow(id: String) -> LocalWorkflowDefinition? {
+        state.workflows[id]
+    }
+
+    public func putStandingGrant(_ grant: LocalStandingGrant) throws {
+        state.grants[key(workflowId: grant.workflowId, capability: grant.capability)] = grant
+        try persist()
+    }
+
+    public func decision(
+        workflowId: String,
+        capability: String,
+        now: Date = Date()
+    ) -> AuthorizationDecision {
+        guard let grant = state.grants[key(workflowId: workflowId, capability: capability)] else {
+            return .unknown
+        }
+        guard grant.allowed else { return .denied }
+        if let expiresAt = grant.expiresAt, expiresAt < now {
+            return .expired
+        }
+        return .allowed
+    }
+
+    private func key(workflowId: String, capability: String) -> String {
+        workflowId + "|" + capability
+    }
+
+    private func persist() throws {
+        let data = try JSONEncoder().encode(state)
+        try data.write(to: stateURL, options: [.atomic])
+    }
+}
