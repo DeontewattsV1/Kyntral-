@@ -22,7 +22,14 @@
 		B00E0000000000000000000E /* RunKyntralWorkflowIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00E0000000000000000000E /* RunKyntralWorkflowIntent.swift */; };
 		B00F0000000000000000000F /* MediaIntakeIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00F0000000000000000000F /* MediaIntakeIntent.swift */; };
 		B01000000000000000000010 /* KyntralAppShortcuts.swift in Sources */ = {isa = PBXBuildFile; fileRef = A01000000000000000000010 /* KyntralAppShortcuts.swift */; };
+		B02000000000000000000020 /* AuthorizationDecisionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A02000000000000000000020 /* AuthorizationDecisionTests.swift */; };
+		B02100000000000000000021 /* KCJCanonicalizerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A02100000000000000000021 /* KCJCanonicalizerTests.swift */; };
+		B02200000000000000000022 /* DedupeLedgerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A02200000000000000000022 /* DedupeLedgerTests.swift */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		G00100000000000000000001 = {isa = PBXContainerItemProxy; containerPortal = E00200000000000000000002 /* Project object */; proxyType = 1; remoteGlobalIDString = E00100000000000000000001; remoteInfo = Kyntral; };
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		A00100000000000000000001 /* KyntralApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KyntralApp/KyntralApp.swift; sourceTree = SOURCE_ROOT; };
@@ -43,43 +50,58 @@
 		A01000000000000000000010 /* KyntralAppShortcuts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KyntralIntents/KyntralAppShortcuts.swift; sourceTree = SOURCE_ROOT; };
 		A01100000000000000000011 /* Kyntral.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Kyntral.entitlements; sourceTree = SOURCE_ROOT; };
 		A01200000000000000000012 /* Kyntral.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Kyntral.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A02000000000000000000020 /* AuthorizationDecisionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KyntralTests/AuthorizationDecisionTests.swift; sourceTree = SOURCE_ROOT; };
+		A02100000000000000000021 /* KCJCanonicalizerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KyntralTests/KCJCanonicalizerTests.swift; sourceTree = SOURCE_ROOT; };
+		A02200000000000000000022 /* DedupeLedgerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KyntralTests/DedupeLedgerTests.swift; sourceTree = SOURCE_ROOT; };
+		A02300000000000000000023 /* KyntralTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = KyntralTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		D00200000000000000000002 = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+		D01200000000000000000012 = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		C00100000000000000000001 = {isa = PBXGroup; children = (A00100000000000000000001,A00200000000000000000002,A00300000000000000000003,A00400000000000000000004,A00500000000000000000005,A00600000000000000000006,A00700000000000000000007,A00800000000000000000008,A00900000000000000000009,A00A0000000000000000000A,A00B0000000000000000000B,A00C0000000000000000000C,A00D0000000000000000000D,A00E0000000000000000000E,A00F0000000000000000000F,A01000000000000000000010,A01100000000000000000011,C00200000000000000000002); sourceTree = "<group>"; };
-		C00200000000000000000002 /* Products */ = {isa = PBXGroup; children = (A01200000000000000000012); name = Products; sourceTree = "<group>"; };
+		C00100000000000000000001 = {isa = PBXGroup; children = (A00100000000000000000001,A00200000000000000000002,A00300000000000000000003,A00400000000000000000004,A00500000000000000000005,A00600000000000000000006,A00700000000000000000007,A00800000000000000000008,A00900000000000000000009,A00A0000000000000000000A,A00B0000000000000000000B,A00C0000000000000000000C,A00D0000000000000000000D,A00E0000000000000000000E,A00F0000000000000000000F,A01000000000000000000010,A01100000000000000000011,A02000000000000000000020,A02100000000000000000021,A02200000000000000000022,C00200000000000000000002); sourceTree = "<group>"; };
+		C00200000000000000000002 /* Products */ = {isa = PBXGroup; children = (A01200000000000000000012,A02300000000000000000023); name = Products; sourceTree = "<group>"; };
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
 		E00100000000000000000001 /* Kyntral */ = {isa = PBXNativeTarget; buildConfigurationList = F00200000000000000000002; buildPhases = (D00100000000000000000001,D00200000000000000000002,D00300000000000000000003); buildRules = (); dependencies = (); name = Kyntral; productName = Kyntral; productReference = A01200000000000000000012; productType = "com.apple.product-type.application"; };
+		E01100000000000000000011 /* KyntralTests */ = {isa = PBXNativeTarget; buildConfigurationList = F01200000000000000000012; buildPhases = (D01100000000000000000011,D01200000000000000000012,D01300000000000000000013); buildRules = (); dependencies = (G00200000000000000000002); name = KyntralTests; productName = KyntralTests; productReference = A02300000000000000000023; productType = "com.apple.product-type.bundle.unit-test"; };
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
-		E00200000000000000000002 /* Project object */ = {isa = PBXProject; attributes = {BuildIndependentTargetsInParallel = 1; LastSwiftUpdateCheck = 1600; LastUpgradeCheck = 1600; TargetAttributes = {E00100000000000000000001 = {CreatedOnToolsVersion = 16.0;};};}; buildConfigurationList = F00100000000000000000001; compatibilityVersion = "Xcode 14.0"; developmentRegion = en; hasScannedForEncodings = 0; knownRegions = (en,Base); mainGroup = C00100000000000000000001; productRefGroup = C00200000000000000000002; projectDirPath = ""; projectRoot = ""; targets = (E00100000000000000000001); };
+		E00200000000000000000002 /* Project object */ = {isa = PBXProject; attributes = {BuildIndependentTargetsInParallel = 1; LastSwiftUpdateCheck = 1600; LastUpgradeCheck = 1600; TargetAttributes = {E00100000000000000000001 = {CreatedOnToolsVersion = 16.0;}; E01100000000000000000011 = {CreatedOnToolsVersion = 16.0; TestTargetID = E00100000000000000000001;};};}; buildConfigurationList = F00100000000000000000001; compatibilityVersion = "Xcode 14.0"; developmentRegion = en; hasScannedForEncodings = 0; knownRegions = (en,Base); mainGroup = C00100000000000000000001; productRefGroup = C00200000000000000000002; projectDirPath = ""; projectRoot = ""; targets = (E00100000000000000000001,E01100000000000000000011); };
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		D00300000000000000000003 = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+		D01300000000000000000013 = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		D00100000000000000000001 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (B00100000000000000000001,B00200000000000000000002,B00300000000000000000003,B00400000000000000000004,B00500000000000000000005,B00600000000000000000006,B00700000000000000000007,B00800000000000000000008,B00900000000000000000009,B00A0000000000000000000A,B00B0000000000000000000B,B00C0000000000000000000C,B00D0000000000000000000D,B00E0000000000000000000E,B00F0000000000000000000F,B01000000000000000000010); runOnlyForDeploymentPostprocessing = 0; };
+		D01100000000000000000011 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (B02000000000000000000020,B02100000000000000000021,B02200000000000000000022); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		G00200000000000000000002 = {isa = PBXTargetDependency; target = E00100000000000000000001 /* Kyntral */; targetProxy = G00100000000000000000001; };
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		F10100000000000000000101 = {isa = XCBuildConfiguration; buildSettings = {CLANG_ENABLE_MODULES = YES; IPHONEOS_DEPLOYMENT_TARGET = 17.0; SDKROOT = iphoneos; SWIFT_VERSION = 5.0;}; name = Debug; };
 		F10200000000000000000102 = {isa = XCBuildConfiguration; buildSettings = {CLANG_ENABLE_MODULES = YES; IPHONEOS_DEPLOYMENT_TARGET = 17.0; SDKROOT = iphoneos; SWIFT_VERSION = 5.0;}; name = Release; };
-		F20100000000000000000201 = {isa = XCBuildConfiguration; buildSettings = {CODE_SIGN_ENTITLEMENTS = Kyntral.entitlements; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 1; ENABLE_PREVIEWS = YES; GENERATE_INFOPLIST_FILE = YES; INFOPLIST_KEY_CFBundleDisplayName = Kyntral; IPHONEOS_DEPLOYMENT_TARGET = 17.0; MARKETING_VERSION = 0.1.0; PRODUCT_BUNDLE_IDENTIFIER = com.deontewatts.kyntral; PRODUCT_NAME = "$(TARGET_NAME)"; SWIFT_EMIT_LOC_STRINGS = YES; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = "1,2";}; name = Debug; };
+		F20100000000000000000201 = {isa = XCBuildConfiguration; buildSettings = {CODE_SIGN_ENTITLEMENTS = Kyntral.entitlements; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 1; ENABLE_PREVIEWS = YES; ENABLE_TESTABILITY = YES; GENERATE_INFOPLIST_FILE = YES; INFOPLIST_KEY_CFBundleDisplayName = Kyntral; IPHONEOS_DEPLOYMENT_TARGET = 17.0; MARKETING_VERSION = 0.1.0; PRODUCT_BUNDLE_IDENTIFIER = com.deontewatts.kyntral; PRODUCT_NAME = "$(TARGET_NAME)"; SWIFT_EMIT_LOC_STRINGS = YES; SWIFT_OPTIMIZATION_LEVEL = "-Onone"; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = "1,2";}; name = Debug; };
 		F20200000000000000000202 = {isa = XCBuildConfiguration; buildSettings = {CODE_SIGN_ENTITLEMENTS = Kyntral.entitlements; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 1; GENERATE_INFOPLIST_FILE = YES; INFOPLIST_KEY_CFBundleDisplayName = Kyntral; IPHONEOS_DEPLOYMENT_TARGET = 17.0; MARKETING_VERSION = 0.1.0; PRODUCT_BUNDLE_IDENTIFIER = com.deontewatts.kyntral; PRODUCT_NAME = "$(TARGET_NAME)"; SWIFT_EMIT_LOC_STRINGS = YES; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = "1,2";}; name = Release; };
+		F21100000000000000000211 = {isa = XCBuildConfiguration; buildSettings = {BUNDLE_LOADER = "$(TEST_HOST)"; CODE_SIGN_STYLE = Automatic; GENERATE_INFOPLIST_FILE = YES; IPHONEOS_DEPLOYMENT_TARGET = 17.0; LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @loader_path/Frameworks"; PRODUCT_BUNDLE_IDENTIFIER = com.deontewatts.kyntral.tests; PRODUCT_NAME = "$(TARGET_NAME)"; SWIFT_VERSION = 5.0; TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Kyntral.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Kyntral";}; name = Debug; };
+		F21200000000000000000212 = {isa = XCBuildConfiguration; buildSettings = {BUNDLE_LOADER = "$(TEST_HOST)"; CODE_SIGN_STYLE = Automatic; GENERATE_INFOPLIST_FILE = YES; IPHONEOS_DEPLOYMENT_TARGET = 17.0; LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @loader_path/Frameworks"; PRODUCT_BUNDLE_IDENTIFIER = com.deontewatts.kyntral.tests; PRODUCT_NAME = "$(TARGET_NAME)"; SWIFT_VERSION = 5.0; TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Kyntral.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Kyntral";}; name = Release; };
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
 		F00100000000000000000001 = {isa = XCConfigurationList; buildConfigurations = (F10100000000000000000101,F10200000000000000000102); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
 		F00200000000000000000002 = {isa = XCConfigurationList; buildConfigurations = (F20100000000000000000201,F20200000000000000000202); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		F01200000000000000000012 = {isa = XCConfigurationList; buildConfigurations = (F21100000000000000000211,F21200000000000000000212); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
 /* End XCConfigurationList section */
 	};
 	rootObject = E00200000000000000000002 /* Project object */;

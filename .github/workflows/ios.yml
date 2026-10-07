@@ -31,3 +31,21 @@ jobs:
           -sdk iphonesimulator
           CODE_SIGNING_ALLOWED=NO
           build
+
+      - name: Select iPhone simulator
+        id: simulator
+        shell: bash
+        run: |
+          DEVICE_ID="$(xcrun simctl list devices available -j | python3 -c 'import json,sys; data=json.load(sys.stdin)["devices"]; print(next(device["udid"] for devices in data.values() for device in devices if device.get("isAvailable") and "iPhone" in device.get("name", "")))')"
+          test -n "$DEVICE_ID"
+          echo "id=$DEVICE_ID" >> "$GITHUB_OUTPUT"
+
+      - name: Run XCTest conformance
+        run: >-
+          xcodebuild
+          -project ios/Kyntral.xcodeproj
+          -scheme Kyntral
+          -configuration Debug
+          -destination "platform=iOS Simulator,id=${{ steps.simulator.outputs.id }}"
+          CODE_SIGNING_ALLOWED=NO
+          test
