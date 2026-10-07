@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kyntral.invalid/schema/device-request-proof.v1.json",
+  "$comment": "SPDX-License-Identifier: Apache-2.0",
+  "title": "Kyntral DeviceRequestProof v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "deviceId",
+    "method",
+    "path",
+    "bodyHash",
+    "nonce",
+    "issuedAt",
+    "expiresAt",
+    "proof"
+  ],
+  "properties": {
+    "version": { "const": "kyntral.device-request.v1" },
+    "deviceId": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9_-]{2,127}$"
+    },
+    "method": { "enum": ["GET", "POST"] },
+    "path": {
+      "type": "string",
+      "pattern": "^/[^?#]*$",
+      "maxLength": 512
+    },
+    "bodyHash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "nonce": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{43}$"
+    },
+    "issuedAt": { "type": "string", "format": "date-time" },
+    "expiresAt": { "type": "string", "format": "date-time" },
+    "proof": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["keyId", "algorithm", "signature"],
+      "properties": {
+        "keyId": { "type": "string", "minLength": 3, "maxLength": 128 },
+        "algorithm": { "const": "ES256" },
+        "signature": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]+$"
+        }
+      }
+    }
+  }
+}
