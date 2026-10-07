@@ -71,7 +71,10 @@ public actor DeviceKeyManager {
             data as CFData,
             &error
         ) as Data? else {
-            throw error?.takeRetainedValue() ?? KyntralKeyError.signature as CFError
+            if let error = error?.takeRetainedValue() {
+                throw error
+            }
+            throw KyntralKeyError.signature
         }
         return signature
     }
