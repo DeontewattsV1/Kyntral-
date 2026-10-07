@@ -37,7 +37,7 @@ public actor KyntralRuntime {
         var stale = false
         let destination = try URL(
             resolvingBookmarkData: bookmark,
-            options: [.withSecurityScope],
+            options: [],
             relativeTo: nil,
             bookmarkDataIsStale: &stale
         )
