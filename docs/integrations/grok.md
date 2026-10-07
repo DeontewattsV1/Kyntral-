@@ -9,6 +9,8 @@ After a production Kyntral MCP endpoint exists:
 3. expose only the reviewed Kyntral tools,
 4. preserve identical scope/risk/receipt semantics across providers.
 
-Provider identity is context. It must not change the meaning of a Kyntral authorization grant.
+## Authorization boundary
+
+Provider identity is transport context. It must not change the meaning of a Kyntral authorization grant. `AUTH-PROVIDER-001` enforces that xAI and OpenAI proposals with the same Kyntral principal/device/scope/workflow/capability/risk normalize to the same `AuthorizationQuery` and yield the same persistent-grant decision.
 
 Do not advertise this integration as live until it has been tested against the then-current xAI connector/API behavior.
