@@ -9,7 +9,7 @@ export type CloudJob = Readonly<{
   workflowId: string;
   capability: string;
   risk: RiskClass;
-  state: "queued" | "executing" | "completed" | "failed" | "cancelled";
+  state: "queued" | "executing" | "completed" | "partial" | "failed" | "cancelled";
   expiresAt: string;
 }>;
 
