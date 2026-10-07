@@ -42,6 +42,41 @@ final class AuthorizationDecisionTests: XCTestCase {
         XCTAssertFalse(AuthorizationDecision.revoked.permitsExecution)
     }
 
+    func testReplayLedgerAllowsOnlyExactActionResume() async throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString + ".json")
+        let ledger = ActionReplayLedger(stateURL: url)
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let retainUntil = now.addingTimeInterval(360)
+
+        let first = try await ledger.reserve(
+            actionId: "act_resume_001",
+            nonce: "nonce_resume_001",
+            idempotencyKey: "idem_resume_001",
+            retainUntil: retainUntil,
+            now: now
+        )
+        XCTAssertEqual(first, .new)
+
+        let exactResume = try await ledger.reserve(
+            actionId: "act_resume_001",
+            nonce: "nonce_resume_001",
+            idempotencyKey: "idem_resume_001",
+            retainUntil: retainUntil,
+            now: now.addingTimeInterval(1)
+        )
+        XCTAssertEqual(exactResume, .resume)
+
+        let conflicting = try await ledger.reserve(
+            actionId: "act_resume_001",
+            nonce: "nonce_other_001",
+            idempotencyKey: "idem_resume_001",
+            retainUntil: retainUntil,
+            now: now.addingTimeInterval(2)
+        )
+        XCTAssertEqual(conflicting, .conflict)
+    }
+
     func testPairingClientRejectsNonHTTPSService() {
         XCTAssertThrowsError(
             try KyntralPairingClient(
