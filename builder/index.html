@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Kyntral Builder Prototype</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <main>
+    <header>
+      <p class="eyebrow">KYNTRAL BUILDER · v0.1 RC PROTOTYPE</p>
+      <h1>Declare capability. Never grant authority.</h1>
+      <p class="lede">Build a portable Capability Manifest without putting private workflow content in the cloud.</p>
+    </header>
+    <section class="grid">
+      <form id="builder">
+        <label>Capability ID<input id="capabilityId" value="org.kyntral.media-intake" required></label>
+        <label>Module version<input id="moduleVersion" value="0.1.0" required></label>
+        <label>Publisher ID<input id="publisherId" value="kyntral_core" required></label>
+        <label>Publisher name<input id="publisherName" value="Kyntral" required></label>
+        <label>Risk<select id="risk"><option>K0</option><option>K1</option><option selected>K2</option><option>K3</option><option>K4</option></select></label>
+        <label>Execution<select id="location"><option selected>device</option><option>cloud</option><option>hybrid</option></select></label>
+        <label class="check"><input id="background" type="checkbox" checked>Background allowed</label>
+        <label>Allowed network domains<input id="domains" placeholder="resolver.example.com"><small>Comma-separated. Blank means no network access.</small></label>
+        <label>Device data<input id="deviceData" value="notes,files"></label>
+        <label>Side effects<input id="effects" value="local-read,network-read,local-write"></label>
+        <label>Destination IDs<input id="destinations" value="dest_media_archive"></label>
+        <button type="submit">Generate manifest</button>
+      </form>
+      <aside>
+        <div class="status"><span></span>This prototype declares requirements only. Runtime grants remain separate.</div>
+        <pre id="output" aria-live="polite"></pre>
+        <button id="copy" type="button">Copy JSON</button>
+      </aside>
+    </section>
+  </main>
+  <script src="./app.js"></script>
+</body>
+</html>
