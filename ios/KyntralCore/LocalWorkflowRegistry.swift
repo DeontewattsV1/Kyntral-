@@ -12,12 +12,31 @@ public struct LocalWorkflowDefinition: Codable, Sendable, Equatable {
 }
 
 public struct LocalStandingGrant: Codable, Sendable, Equatable {
+    public let scopeId: String?
     public let workflowId: String
     public let capability: String
     public let risk: KyntralRiskClass
     public let allowed: Bool
     public let issuedAt: Date
     public let expiresAt: Date?
+
+    public init(
+        scopeId: String? = nil,
+        workflowId: String,
+        capability: String,
+        risk: KyntralRiskClass,
+        allowed: Bool,
+        issuedAt: Date,
+        expiresAt: Date?
+    ) {
+        self.scopeId = scopeId
+        self.workflowId = workflowId
+        self.capability = capability
+        self.risk = risk
+        self.allowed = allowed
+        self.issuedAt = issuedAt
+        self.expiresAt = expiresAt
+    }
 }
 
 private struct LocalRegistryState: Codable {
@@ -69,12 +88,16 @@ public actor LocalWorkflowRegistry {
         workflowId: String,
         capability: String,
         risk: KyntralRiskClass? = nil,
+        scopeId: String? = nil,
         now: Date = Date()
     ) -> AuthorizationDecision {
         guard let grant = state.grants[key(workflowId: workflowId, capability: capability)] else {
             return .unknown
         }
         if let risk, grant.risk != risk {
+            return .denied
+        }
+        if let scopeId, grant.scopeId != scopeId {
             return .denied
         }
         guard grant.allowed else { return .denied }
