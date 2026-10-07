@@ -25,39 +25,6 @@ let store: SqliteKyntralStore | undefined;
 afterEach(() => {
   store?.close();
   store = undefined;
-  it("claims one device action atomically and redelivers the same in-flight action", () => {
-    store = new SqliteKyntralStore(":memory:");
-    const action = vectors.signedAction;
-    const job = createCloudJob({
-      actionId: action.actionId,
-      deviceId: action.deviceId,
-      scopeId: action.scopeId,
-      workflowId: action.workflowId,
-      capability: action.capability,
-      risk: action.risk,
-      expiresAt: action.expiresAt
-    });
-
-    store.putAuthorizedJob(job, {
-      action,
-      authorizationKey: vectors.authorizationPublicKeyJwk,
-      actionHash: vectors.actionHash
-    }, new Date("2026-10-06T23:00:00.000Z"));
-
-    const first = store.claimNextAction(
-      action.deviceId,
-      new Date("2026-10-06T23:01:00.000Z")
-    );
-    expect(first?.job.state).toBe("executing");
-    expect(first?.signedAction.action).toEqual(action);
-
-    const resumed = store.claimNextAction(
-      action.deviceId,
-      new Date("2026-10-06T23:01:30.000Z")
-    );
-    expect(resumed?.signedAction.action.actionId).toBe(action.actionId);
-    expect(store.getJob(action.actionId)?.state).toBe("executing");
-  });
 });
 
 describe("SqliteKyntralStore", () => {
@@ -103,5 +70,39 @@ describe("SqliteKyntralStore", () => {
 
     store.putReceipt(receipt);
     expect(store.getReceipt(receipt.actionId)).toEqual(receipt);
+  });
+
+  it("claims one device action atomically and redelivers the same in-flight action", () => {
+    store = new SqliteKyntralStore(":memory:");
+    const action = vectors.signedAction;
+    const job = createCloudJob({
+      actionId: action.actionId,
+      deviceId: action.deviceId,
+      scopeId: action.scopeId,
+      workflowId: action.workflowId,
+      capability: action.capability,
+      risk: action.risk,
+      expiresAt: action.expiresAt
+    });
+
+    store.putAuthorizedJob(job, {
+      action,
+      authorizationKey: vectors.authorizationPublicKeyJwk,
+      actionHash: vectors.actionHash
+    }, new Date("2026-10-06T23:00:00.000Z"));
+
+    const first = store.claimNextAction(
+      action.deviceId,
+      new Date("2026-10-06T23:01:00.000Z")
+    );
+    expect(first?.job.state).toBe("executing");
+    expect(first?.signedAction.action).toEqual(action);
+
+    const resumed = store.claimNextAction(
+      action.deviceId,
+      new Date("2026-10-06T23:01:30.000Z")
+    );
+    expect(resumed?.signedAction.action.actionId).toBe(action.actionId);
+    expect(store.getJob(action.actionId)?.state).toBe("executing");
   });
 });
