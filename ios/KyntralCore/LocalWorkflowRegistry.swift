@@ -68,10 +68,14 @@ public actor LocalWorkflowRegistry {
     public func decision(
         workflowId: String,
         capability: String,
+        risk: KyntralRiskClass? = nil,
         now: Date = Date()
     ) -> AuthorizationDecision {
         guard let grant = state.grants[key(workflowId: workflowId, capability: capability)] else {
             return .unknown
+        }
+        if let risk, grant.risk != risk {
+            return .denied
         }
         guard grant.allowed else { return .denied }
         if let expiresAt = grant.expiresAt, expiresAt < now {
