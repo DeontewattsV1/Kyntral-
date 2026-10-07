@@ -42,6 +42,56 @@ final class AuthorizationDecisionTests: XCTestCase {
         XCTAssertFalse(AuthorizationDecision.revoked.permitsExecution)
     }
 
+    func testStandingGrantRequiresExactScope() async throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString + ".json")
+        let registry = LocalWorkflowRegistry(stateURL: url)
+        let workflow = LocalWorkflowDefinition(
+            id: "wf_media_intake",
+            capability: "workflow.execute",
+            risk: .k2,
+            scopeId: "scope_a_001",
+            resolverEndpoint: nil,
+            destinationBookmark: nil,
+            allowedResolverHosts: []
+        )
+        try await registry.putWorkflow(workflow)
+        try await registry.putStandingGrant(
+            LocalStandingGrant(
+                scopeId: "scope_a_001",
+                workflowId: workflow.id,
+                capability: workflow.capability,
+                risk: workflow.risk,
+                allowed: true,
+                issuedAt: Date(),
+                expiresAt: nil
+            )
+        )
+
+        let allowed = await registry.decision(
+            workflowId: workflow.id,
+            capability: workflow.capability,
+            risk: workflow.risk,
+            scopeId: "scope_a_001"
+        )
+        let wrongScope = await registry.decision(
+            workflowId: workflow.id,
+            capability: workflow.capability,
+            risk: workflow.risk,
+            scopeId: "scope_b_001"
+        )
+        let missingScope = await registry.decision(
+            workflowId: workflow.id,
+            capability: workflow.capability,
+            risk: workflow.risk,
+            scopeId: nil
+        )
+
+        XCTAssertEqual(allowed, .allowed)
+        XCTAssertEqual(wrongScope, .denied)
+        XCTAssertEqual(missingScope, .denied)
+    }
+
     func testReplayLedgerAllowsOnlyExactActionResume() async throws {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString + ".json")
