@@ -109,32 +109,31 @@ final class KCJCanonicalizerTests: XCTestCase {
         let now = Date(timeIntervalSince1970: 1_800_000_000)
         let retainUntil = now.addingTimeInterval(360)
 
-        XCTAssertTrue(
-            try await ledger.consume(
-                actionId: "act_replay_001",
-                nonce: "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
-                idempotencyKey: "idem_replay_0001",
-                retainUntil: retainUntil,
-                now: now
-            )
+        let first = try await ledger.consume(
+            actionId: "act_replay_001",
+            nonce: "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+            idempotencyKey: "idem_replay_0001",
+            retainUntil: retainUntil,
+            now: now
         )
-        XCTAssertFalse(
-            try await ledger.consume(
-                actionId: "act_replay_002",
-                nonce: "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
-                idempotencyKey: "idem_replay_0002",
-                retainUntil: retainUntil,
-                now: now
-            )
+        XCTAssertTrue(first)
+
+        let replayedNonce = try await ledger.consume(
+            actionId: "act_replay_002",
+            nonce: "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+            idempotencyKey: "idem_replay_0002",
+            retainUntil: retainUntil,
+            now: now
         )
-        XCTAssertFalse(
-            try await ledger.consume(
-                actionId: "act_replay_003",
-                nonce: "CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC",
-                idempotencyKey: "idem_replay_0001",
-                retainUntil: retainUntil,
-                now: now
-            )
+        XCTAssertFalse(replayedNonce)
+
+        let replayedIdempotencyKey = try await ledger.consume(
+            actionId: "act_replay_003",
+            nonce: "CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC",
+            idempotencyKey: "idem_replay_0001",
+            retainUntil: retainUntil,
+            now: now
         )
+        XCTAssertFalse(replayedIdempotencyKey)
     }
 }
