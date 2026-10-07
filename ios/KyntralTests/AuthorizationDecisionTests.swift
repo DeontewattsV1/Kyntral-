@@ -82,7 +82,8 @@ final class AuthorizationDecisionTests: XCTestCase {
         } catch {
             XCTFail("Unexpected error: \(error)")
         }
-        XCTAssertEqual(try await trustStore.current(), first)
+        let pinnedAfterRotationAttempt = try await trustStore.current()
+        XCTAssertEqual(pinnedAfterRotationAttempt, first)
         try await trustStore.resetForExplicitRepair()
     }
 
