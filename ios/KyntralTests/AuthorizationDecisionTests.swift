@@ -120,11 +120,24 @@ final class AuthorizationDecisionTests: XCTestCase {
                 )
                 XCTAssertFalse((proof["signature"] as? String ?? "").isEmpty)
 
+                let signingKeyId = try XCTUnwrap(signingKey["kid"] as? String)
+                let agreementKeyId = try XCTUnwrap(
+                    agreementKey["kid"] as? String
+                )
                 let response: [String: Any] = [
                     "deviceId": deviceId,
                     "state": "paired",
-                    "signingKeyId": signingKey["kid"] as Any,
-                    "keyAgreementKeyId": agreementKey["kid"] as Any
+                    "signingKeyId": signingKeyId,
+                    "keyAgreementKeyId": agreementKeyId,
+                    "authorizationSigningKey": [
+                        "kty": "EC",
+                        "crv": "P-256",
+                        "x": String(repeating: "A", count: 43),
+                        "y": String(repeating: "B", count: 43),
+                        "kid": "auth-test-01",
+                        "use": "sig",
+                        "alg": "ES256"
+                    ]
                 ]
                 let data = try JSONSerialization.data(withJSONObject: response)
                 return (
