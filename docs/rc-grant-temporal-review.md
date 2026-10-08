@@ -1,0 +1,44 @@
+# RC grant temporal integrity review
+
+Base: `20a6a6047f19e793e03e254304cec1c59d4ac47a`.
+Review date: 2026-10-08 UTC. Implementation and regression tests: AI-assisted.
+
+## Verified narrow boundary
+
+Persistent authorization now returns `Unknown` for invalid evaluation clocks,
+invalid issue/expiry timestamps, future issue times, and nonpositive grant
+intervals. Only `Allowed` permits execution. Explicit denial and revocation
+retain precedence. Valid unbounded grants remain supported. Existing expiry
+comparison semantics are preserved; this change adds no clock-skew allowance.
+
+The original evaluator returned `Allowed` in four regression cases: malformed
+expiry, malformed issue time, invalid evaluation clock, and future issue time.
+The reversed/empty interval cases previously returned `Expired` and now return
+`Unknown`, because their temporal evidence is malformed.
+
+Verification: typecheck passes; 54 unit tests and 53 conformance tests pass;
+dependency audit reports zero vulnerabilities. Running the new unit regression
+cases against the original evaluator fails six cases, establishing that the
+tests distinguish the fix from the baseline. Persistent SQLite conformance also
+checks that malformed expiry cannot override explicit denial or revocation.
+
+Adversarial review: valid unbounded grants still authorize; malformed grants
+fail closed; denial/revocation remain distinct; all comparisons use epoch
+milliseconds. No user payload, new scope, signing format, provider exception,
+or endpoint replacement is introduced. A separate security-focused review is
+still required before release under AGENTS.md.
+
+## Unresolved release gates
+
+This review does not establish production HTTPS MCP deployment, production OAuth,
+live OpenAI/Grok interoperability, physical-device/TestFlight validation, active
+repository protection, secret-scan completion, or legal approval. The reserved
+`.invalid` endpoint remains reserved. Product Hunt remains unscheduled.
+
+## Next narrow boundary
+
+Review fail-closed runtime timestamp handling across signed action, pairing,
+device-request, and nonce paths, including invalid clocks and persisted temporal
+metadata. Freeze interoperable vectors only after the same semantics are checked
+against the iOS implementation. Do not infer execution or verification from an
+authorization decision.

@@ -46,6 +46,31 @@ describe("Kyntral authorization boundary", () => {
     expect(() => requireAllowed(decision)).not.toThrow();
   });
 
+  it.each([
+    ["invalid expiry", "2026-10-06T23:00:00.000Z", "invalid", "2026-10-06T23:10:00.000Z", "Unknown"],
+    ["invalid issue time", "invalid", null, "2026-10-06T23:10:00.000Z", "Unknown"],
+    ["invalid clock", "2026-10-06T23:00:00.000Z", null, "invalid", "Unknown"],
+    ["future issue time", "2026-10-06T23:20:00.000Z", null, "2026-10-06T23:10:00.000Z", "Unknown"],
+    ["reversed interval", "2026-10-06T23:00:00.000Z", "2026-10-06T22:00:00.000Z", "2026-10-06T23:10:00.000Z", "Unknown"],
+    ["empty interval", "2026-10-06T23:00:00.000Z", "2026-10-06T23:00:00.000Z", "2026-10-06T23:10:00.000Z", "Unknown"],
+    ["expired grant", "2026-10-06T23:00:00.000Z", "2026-10-06T23:05:00.000Z", "2026-10-06T23:10:00.000Z", "Expired"],
+    ["valid unbounded grant", "2026-10-06T23:00:00.000Z", null, "2026-10-06T23:10:00.000Z", "Allowed"]
+  ])("evaluates %s without granting malformed authority", async (_label, issuedAt, expiresAt, now, expected) => {
+    store = new SqliteKyntralStore(":memory:");
+    store.putDevice({
+      deviceId: query.deviceId, principalId: query.principalId,
+      identityJson: JSON.stringify({ deviceId: query.deviceId }),
+      createdAt: "2026-10-06T23:00:00.000Z", revokedAt: null
+    });
+    store.putCapabilityGrant({
+      grantId: "grant_temporal_001", ...query, status: "Allowed",
+      issuedAt: issuedAt!, expiresAt: expiresAt ?? null, revokedAt: null
+    });
+    const decision = await new PersistentAuthorizationStore(store).evaluate(query, new Date(now!));
+    expect(decision).toBe(expected);
+    if (expected !== "Allowed") expect(() => requireAllowed(decision)).toThrow();
+  });
+
   it("binds a grant to the exact principal, device, scope, workflow and capability", async () => {
     store = new SqliteKyntralStore(":memory:");
     store.putDevice({

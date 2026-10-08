@@ -62,7 +62,16 @@ export class PersistentAuthorizationStore implements AuthorizationStore {
     if (!grant) return "Unknown";
     if (grant.revokedAt !== null || grant.status === "Revoked") return "Revoked";
     if (grant.status === "Denied") return "Denied";
-    if (grant.expiresAt !== null && Date.parse(grant.expiresAt) < now.getTime()) {
+    const nowMs = now.getTime();
+    const issuedMs = Date.parse(grant.issuedAt);
+    const expiresMs = grant.expiresAt === null ? null : Date.parse(grant.expiresAt);
+    // Malformed persisted timestamps must never turn an explicit status into authority.
+    if (!Number.isFinite(nowMs) || !Number.isFinite(issuedMs) ||
+        (expiresMs !== null && (!Number.isFinite(expiresMs) || expiresMs <= issuedMs))) {
+      return "Unknown";
+    }
+    if (issuedMs > nowMs) return "Unknown";
+    if (expiresMs !== null && expiresMs < nowMs) {
       return "Expired";
     }
     return grant.status === "Allowed" ? "Allowed" : "Unknown";
