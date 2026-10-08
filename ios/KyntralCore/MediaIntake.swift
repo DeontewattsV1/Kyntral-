@@ -112,6 +112,9 @@ public struct CobaltCompatibleResolver: MediaResolver {
     }
 
     public func download(_ media: ResolvedMedia) async throws -> Data {
+        guard media.url.scheme?.lowercased() == "https" else {
+            throw CobaltResolverError.sourceMustUseHTTPS
+        }
         let (data, response) = try await session.data(from: media.url)
         guard let http = response as? HTTPURLResponse,
               200..<300 ~= http.statusCode else {
