@@ -3,7 +3,7 @@
 import { mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { assertPairingTimeWindow } from "./time.js";
+import { assertPairingTimeWindow, assertActionTimeWindow, parseInstant, MAX_CLOCK_SKEW_MS } from "./time.js";
 import type {
   AuthorizationQuery,
   CapabilityGrantRecord
@@ -60,6 +60,7 @@ export interface KyntralStore {
   putPairingChallenge(challenge: StoredPairingChallenge): void;
   getPairingChallenge(challengeId: string): StoredPairingChallenge | null;
   consumePairingChallenge(challengeId: string, now?: Date): boolean;
+  completePairing(challengeId: string, device: StoredDevice, now?: Date): void;
   putDevice(device: StoredDevice): void;
   getDevice(deviceId: string): StoredDevice | null;
   revokeDevice(deviceId: string, revokedAt?: Date): boolean;
@@ -173,42 +174,29 @@ export class SqliteKyntralStore implements KyntralStore {
     deviceId: string,
     now = new Date()
   ): ClaimedDeviceAction | null {
-    const nowIso = now.toISOString();
+    now.toISOString();
     this.#db.exec("BEGIN IMMEDIATE");
     try {
-      let row = this.#db.prepare(
-        "SELECT action_id FROM jobs WHERE device_id = ? AND state = 'executing' AND expires_at >= ? ORDER BY created_at ASC LIMIT 1"
-      ).get(deviceId, nowIso) as Row | undefined;
-
-      if (!row) {
-        row = this.#db.prepare(
-          "SELECT action_id FROM jobs WHERE device_id = ? AND state = 'queued' AND expires_at >= ? ORDER BY created_at ASC LIMIT 1"
-        ).get(deviceId, nowIso) as Row | undefined;
-
-        if (row) {
-          const result = this.#db.prepare(
-            "UPDATE jobs SET state = 'executing' WHERE action_id = ? AND state = 'queued'"
-          ).run(String(row.action_id));
-          if (Number(result.changes) !== 1) {
-            throw new Error("device action claim lost");
-          }
-        }
-      }
-
-      if (!row) {
+      const candidates = this.#db.prepare(
+        "SELECT action_id FROM jobs WHERE device_id = ? AND state IN ('executing', 'queued') ORDER BY CASE state WHEN 'executing' THEN 0 ELSE 1 END, created_at ASC"
+      ).all(deviceId) as Row[];
+      for (const row of candidates) {
+        const actionId = String(row.action_id);
+        const job = this.getJob(actionId);
+        const signedAction = this.getSignedAction(actionId);
+        if (!job || !signedAction) throw new Error("claimed action is incomplete");
+        try {
+          if (parseInstant(job.expiresAt, "job.expiresAt") !==
+              parseInstant(signedAction.action.expiresAt, "action.expiresAt")) continue;
+          assertActionTimeWindow({ ...signedAction.action, now });
+        } catch { continue; }
+        if (job.state === "queued") this.updateJobState(actionId, "executing");
+        const claimedJob = this.getJob(actionId)!;
         this.#db.exec("COMMIT");
-        return null;
+        return { job: claimedJob, signedAction };
       }
-
-      const actionId = String(row.action_id);
-      const job = this.getJob(actionId);
-      const signedAction = this.getSignedAction(actionId);
-      if (!job || !signedAction) {
-        throw new Error("claimed action is incomplete");
-      }
-
       this.#db.exec("COMMIT");
-      return { job, signedAction };
+      return null;
     } catch (error) {
       this.#db.exec("ROLLBACK");
       throw error;
@@ -274,7 +262,8 @@ export class SqliteKyntralStore implements KyntralStore {
     expiresAt: string,
     now = new Date()
   ): boolean {
-    const expiresMs = Date.parse(expiresAt);
+    let expiresMs: number;
+    try { expiresMs = parseInstant(expiresAt, "nonce.expiresAt"); } catch { return false; }
     const nowMs = now.getTime();
     if (!Number.isFinite(expiresMs) || !Number.isFinite(nowMs) || expiresMs < nowMs) return false;
     const result = this.#db.prepare(
@@ -320,6 +309,26 @@ export class SqliteKyntralStore implements KyntralStore {
       "UPDATE pairing_challenges SET consumed_at = ? WHERE challenge_id = ? AND consumed_at IS NULL"
     ).run(now.toISOString(), challengeId);
     return Number(result.changes) === 1;
+  }
+
+  completePairing(challengeId: string, device: StoredDevice, now = new Date()): void {
+    this.#db.exec("BEGIN IMMEDIATE");
+    try {
+      const challenge = this.getPairingChallenge(challengeId);
+      if (!challenge || challenge.principalId !== device.principalId) throw new Error("pairing principal mismatch");
+      const existing = this.getDevice(device.deviceId);
+      if (existing && existing.revokedAt !== null) {
+        throw new Error("device identity is revoked");
+      }
+      if (!this.consumePairingChallenge(challengeId, now)) throw new Error("pairing challenge replay detected");
+      const retainUntil = new Date(parseInstant(challenge.expiresAt, "expiresAt") + MAX_CLOCK_SKEW_MS).toISOString();
+      if (!this.consumeNonce("pairing", challenge.nonce, retainUntil, now)) throw new Error("pairing nonce replay detected");
+      this.putDevice(device);
+      this.#db.exec("COMMIT");
+    } catch (error) {
+      this.#db.exec("ROLLBACK");
+      throw error;
+    }
   }
 
   putDevice(device: StoredDevice): void {
