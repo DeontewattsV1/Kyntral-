@@ -3,6 +3,7 @@
 import { mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import { assertPairingTimeWindow } from "./time.js";
 import type {
   AuthorizationQuery,
   CapabilityGrantRecord
@@ -273,7 +274,9 @@ export class SqliteKyntralStore implements KyntralStore {
     expiresAt: string,
     now = new Date()
   ): boolean {
-    if (Date.parse(expiresAt) < now.getTime()) return false;
+    const expiresMs = Date.parse(expiresAt);
+    const nowMs = now.getTime();
+    if (!Number.isFinite(expiresMs) || !Number.isFinite(nowMs) || expiresMs < nowMs) return false;
     const result = this.#db.prepare(
       "INSERT OR IGNORE INTO consumed_nonces (namespace, nonce, expires_at, consumed_at) VALUES (?, ?, ?, ?)"
     ).run(namespace, nonce, expiresAt, now.toISOString());
@@ -306,9 +309,16 @@ export class SqliteKyntralStore implements KyntralStore {
   }
 
   consumePairingChallenge(challengeId: string, now = new Date()): boolean {
+    const challenge = this.getPairingChallenge(challengeId);
+    if (!challenge || challenge.consumedAt !== null) return false;
+    try {
+      assertPairingTimeWindow({ ...challenge, now });
+    } catch {
+      return false;
+    }
     const result = this.#db.prepare(
-      "UPDATE pairing_challenges SET consumed_at = ? WHERE challenge_id = ? AND consumed_at IS NULL AND expires_at >= ?"
-    ).run(now.toISOString(), challengeId, now.toISOString());
+      "UPDATE pairing_challenges SET consumed_at = ? WHERE challenge_id = ? AND consumed_at IS NULL"
+    ).run(now.toISOString(), challengeId);
     return Number(result.changes) === 1;
   }
 

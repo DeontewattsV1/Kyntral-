@@ -10,7 +10,7 @@ import {
 } from "./crypto.js";
 import { assertOpaqueId } from "./domain.js";
 import type { KyntralStore, StoredPairingChallenge } from "./store.js";
-import { assertPairingTimeWindow, MAX_PAIRING_LIFETIME_MS } from "./time.js";
+import { assertPairingTimeWindow, MAX_PAIRING_LIFETIME_MS, MAX_CLOCK_SKEW_MS } from "./time.js";
 
 export type DeviceIdentity = Readonly<{
   version: "kyntral.device.v1";
@@ -126,7 +126,8 @@ export function verifyAndConsumePairingProof(input: {
   if (!input.store.consumePairingChallenge(challenge.challengeId, now)) {
     throw new Error("pairing challenge replay detected");
   }
-  if (!input.store.consumeNonce("pairing", challenge.nonce, challenge.expiresAt, now)) {
+  const retainUntil = new Date(Date.parse(challenge.expiresAt) + MAX_CLOCK_SKEW_MS).toISOString();
+  if (!input.store.consumeNonce("pairing", challenge.nonce, retainUntil, now)) {
     throw new Error("pairing nonce replay detected");
   }
 
