@@ -70,3 +70,29 @@ separate decision and shared vectors. Action polling uses raw-expiry SQL string
 comparisons, potentially stricter than device action validation and sensitive to
 noncanonical persisted times. Pairing challenge/nonce consumption are separate
 writes; crash-safe transaction handling remains a separate review boundary.
+
+## Strict parsing, polling, and atomic pairing proposal
+
+Continuation from main a4df7c5. Shared parsing now validates calendar dates and
+requires a proposed millisecond-resolution RFC3339 profile: uppercase T/Z,
+explicit known timezone, zero to three fractional digits, and no leap seconds.
+Unknown offset -00:00 and greater-than-millisecond precision are rejected. This
+is an RC protocol-profile proposal requiring security/interoperability review,
+not a claim of support for every RFC3339 representation. Grant evaluation and
+nonce persistence use the same parser.
+
+Action polling compares parsed epoch times and validates the signed action's
+full lifetime/skew window before changing state. A job expiry must represent the
+same instant as its action expiry. Invalid/expired candidates are skipped.
+Pairing challenge consumption, nonce consumption, and device persistence are now
+one BEGIN IMMEDIATE transaction, including a revocation recheck under the write
+lock. An injected malformed device write proves challenge and nonce rollback;
+retry succeeds once and replay fails.
+
+Local evidence: typecheck, 70 unit tests, and 54 conformance tests pass. Tests
+cover invalid dates, leap dates, equivalent offsets, action delivery at the skew
+endpoint and rejection one millisecond later, and pairing failure rollback.
+The hosted iOS workflow now triggers on shared timestamp/protocol/conformance
+changes. Xcode is unavailable in this Linux runtime; simulator and physical-device
+results must remain unverified until actual evidence is available. Swift parser
+alignment with the proposed strict profile remains an interoperability blocker.
