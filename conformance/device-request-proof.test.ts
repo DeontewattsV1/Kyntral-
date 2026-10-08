@@ -8,9 +8,11 @@ import type {
 import {
   deviceRequestSigningPreimage,
   sha256Bytes,
+  verifyAndConsumeDeviceRequest,
   unsignedDeviceRequestProjection,
   type DeviceRequestProof
 } from "../control-plane/src/device-request.js";
+import { SqliteKyntralStore } from "../control-plane/src/store.js";
 import {
   canonicalizeJson,
   verifyEs256
@@ -32,6 +34,25 @@ const vector = JSON.parse(
 };
 
 describe("DEVICE-004 device possession request vector", () => {
+  it("fails closed on an invalid clock and retains replay protection through request skew", () => {
+    const store = new SqliteKyntralStore(":memory:");
+    try {
+      store.putDevice({
+        deviceId: vector.signedRequest.deviceId, principalId: "usr_vector",
+        identityJson: JSON.stringify({ signingPublicKey: vector.publicKeyJwk }),
+        createdAt: vector.signedRequest.issuedAt, revokedAt: null
+      });
+      const verify = (now: Date) => verifyAndConsumeDeviceRequest({
+        store, proof: vector.signedRequest, expectedDeviceId: vector.signedRequest.deviceId,
+        method: "GET", path: vector.signedRequest.path, body: new Uint8Array(), now
+      });
+      expect(() => verify(new Date(NaN))).toThrow(/valid timestamp/);
+      const end = Date.parse(vector.signedRequest.expiresAt) + 30_000;
+      expect(() => verify(new Date(end + 1))).toThrow(/expired/);
+      expect(() => verify(new Date(end))).not.toThrow();
+      expect(() => verify(new Date(end))).toThrow(/replay/);
+    } finally { store.close(); }
+  });
   it("matches KCJ-1 and verifies the frozen ES256 signature", () => {
     expect(
       canonicalizeJson(
