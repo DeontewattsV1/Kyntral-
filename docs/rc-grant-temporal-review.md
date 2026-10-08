@@ -42,3 +42,31 @@ device-request, and nonce paths, including invalid clocks and persisted temporal
 metadata. Freeze interoperable vectors only after the same semantics are checked
 against the iOS implementation. Do not infer execution or verification from an
 authorization decision.
+
+## Timestamp boundary continuation
+
+Shared temporal validation now rejects nonfinite evaluation clocks and invalid
+skew/lifetime policy values. Nonce consumption rejects malformed expiries and
+invalid clocks before writing. Pairing challenge consumption uses the same
+validated five-minute lifetime and inclusive 60-second skew as proof validation;
+pairing nonce retention includes that skew. The atomic consumed-state update
+continues to permit only one consumer.
+
+Additional evidence: typecheck passes, 62 unit tests and 54 conformance tests
+pass. Pairing tests cover issuance, raw expiry, and expiry plus skew, with replay
+rejection at each point. Invalid-clock and one-millisecond-past-skew failures do
+not consume challenges. The frozen signed device-request vector fails closed
+with an invalid clock, accepts exactly at expiry plus 30 seconds, and rejects
+replay and one millisecond beyond skew. Nonce tests verify rejected malformed
+inputs leave the nonce available for a subsequent valid consumption.
+
+Static iOS review: action time comparisons use rejecting guards, and replay
+retention uses expiry plus accepted skew with inclusive retention. This is source
+inspection, not Xcode or physical-device execution evidence.
+
+Remaining timestamp questions: JavaScript Date.parse accepts some non-RFC3339
+inputs; strict interoperable timestamp syntax and calendar validation need a
+separate decision and shared vectors. Action polling uses raw-expiry SQL string
+comparisons, potentially stricter than device action validation and sensitive to
+noncanonical persisted times. Pairing challenge/nonce consumption are separate
+writes; crash-safe transaction handling remains a separate review boundary.
