@@ -100,9 +100,24 @@ describe("SqliteKyntralStore", () => {
 
     const resumed = store.claimNextAction(
       action.deviceId,
-      new Date("2026-10-06T23:01:30.000Z")
+      new Date("2026-10-06T23:06:00.000Z")
     );
     expect(resumed?.signedAction.action.actionId).toBe(action.actionId);
     expect(store.getJob(action.actionId)?.state).toBe("executing");
+    expect(store.claimNextAction(action.deviceId, new Date("2026-10-06T23:06:00.001Z"))).toBeNull();
+  });
+});
+
+describe("atomic pairing persistence", () => {
+  it("rolls challenge and nonce back when device persistence fails", () => {
+    store = new SqliteKyntralStore(":memory:");
+    const now = new Date("2026-10-07T00:00:00Z");
+    store.putPairingChallenge({ challengeId: "pair_atomic", principalId: "usr_atomic", nonce: "nonce_atomic", issuedAt: now.toISOString(), expiresAt: "2026-10-07T00:05:00Z", consumedAt: null });
+    const device = { deviceId: "dev_atomic", principalId: "usr_atomic", identityJson: "invalid-json", createdAt: now.toISOString(), revokedAt: null };
+    expect(() => store!.completePairing("pair_atomic", device, now)).toThrow();
+    expect(store.getPairingChallenge("pair_atomic")?.consumedAt).toBeNull();
+    expect(store.getDevice("dev_atomic")).toBeNull();
+    expect(() => store!.completePairing("pair_atomic", { ...device, identityJson: "{}" }, now)).not.toThrow();
+    expect(() => store!.completePairing("pair_atomic", { ...device, identityJson: "{}" }, now)).toThrow(/replay/);
   });
 });

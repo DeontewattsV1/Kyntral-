@@ -4,10 +4,17 @@ export const MAX_CLOCK_SKEW_MS = 60_000;
 export const MAX_ACTION_LIFETIME_MS = 5 * 60_000;
 export const MAX_PAIRING_LIFETIME_MS = 5 * 60_000;
 
-function parseInstant(value: string, field: string): number {
+export function parseInstant(value: string, field: string): number {
+  // Millisecond-resolution RFC3339 profile; reject calendar normalization.
+  const match = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})(?:\.\d{1,3})?(Z|[+-]\d{2}:\d{2})$/.exec(value);
   const parsed = Date.parse(value);
-  if (!Number.isFinite(parsed)) {
-    throw new Error(`${field} must be a valid RFC 3339 timestamp`);
+  const local = match ? Date.parse(`${match[1]}T${match[2]}Z`) : NaN;
+  const zone = match?.[3];
+  const validZone = zone === "Z" || (zone !== undefined && zone !== "-00:00" &&
+    Number(zone.slice(1, 3)) <= 23 && Number(zone.slice(4)) <= 59);
+  if (!match || !validZone || !Number.isFinite(parsed) || !Number.isFinite(local) ||
+      new Date(local).toISOString().slice(0, 19) !== `${match[1]}T${match[2]}`) {
+    throw new Error(`${field} must be a valid millisecond RFC 3339 timestamp`);
   }
   return parsed;
 }

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 
+import { parseInstant } from "./time.js";
 import type { RiskClass } from "./domain.js";
 import type { KyntralStore } from "./store.js";
 
@@ -63,8 +64,12 @@ export class PersistentAuthorizationStore implements AuthorizationStore {
     if (grant.revokedAt !== null || grant.status === "Revoked") return "Revoked";
     if (grant.status === "Denied") return "Denied";
     const nowMs = now.getTime();
-    const issuedMs = Date.parse(grant.issuedAt);
-    const expiresMs = grant.expiresAt === null ? null : Date.parse(grant.expiresAt);
+    let issuedMs: number;
+    let expiresMs: number | null;
+    try {
+      issuedMs = parseInstant(grant.issuedAt, "issuedAt");
+      expiresMs = grant.expiresAt === null ? null : parseInstant(grant.expiresAt, "expiresAt");
+    } catch { return "Unknown"; }
     // Malformed persisted timestamps must never turn an explicit status into authority.
     if (!Number.isFinite(nowMs) || !Number.isFinite(issuedMs) ||
         (expiresMs !== null && (!Number.isFinite(expiresMs) || expiresMs <= issuedMs))) {
