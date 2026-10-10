@@ -90,9 +90,9 @@ function assertOwnsDevice(
 
 const executionReceiptSchema = z.object({
   version: z.literal("kyntral.receipt.v1"),
-  receiptId: z.string().min(3).max(128),
-  actionId: z.string().min(3).max(128),
-  deviceId: z.string().min(3).max(128),
+  receiptId: z.string().regex(/^[A-Za-z][A-Za-z0-9_-]{2,127}$/),
+  actionId: z.string().regex(/^[A-Za-z][A-Za-z0-9_-]{2,127}$/),
+  deviceId: z.string().regex(/^[A-Za-z][A-Za-z0-9_-]{2,127}$/),
   actionHash: z.string().regex(/^sha256:[0-9a-f]{64}$/),
   outcome: z.enum(["completed", "partial", "failed", "cancelled"]),
   startedAt: z.string(),
