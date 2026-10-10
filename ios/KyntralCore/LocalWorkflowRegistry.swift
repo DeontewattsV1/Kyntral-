@@ -120,8 +120,21 @@ public actor LocalWorkflowRegistry {
             return .denied
         }
         guard grant.allowed else { return .denied }
-        if let expiresAt = grant.expiresAt, expiresAt < now {
-            return .expired
+        if !now.timeIntervalSinceReferenceDate.isFinite ||
+           !grant.issuedAt.timeIntervalSinceReferenceDate.isFinite {
+            return .unknown
+        }
+        if now < grant.issuedAt {
+            return .unknown
+        }
+        if let expiresAt = grant.expiresAt {
+            guard expiresAt.timeIntervalSinceReferenceDate.isFinite,
+                  expiresAt > grant.issuedAt else {
+                return .unknown
+            }
+            if expiresAt < now {
+                return .expired
+            }
         }
         return .allowed
     }

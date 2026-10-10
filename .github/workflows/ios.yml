@@ -18,50 +18,27 @@ on:
       - "conformance/**"
       - ".github/workflows/ios.yml"
 
-concurrency:
-  group: ios-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 permissions:
   contents: read
 
 jobs:
-  build-ios:
-    runs-on: macos-15
+  ios-build-test:
+    runs-on: macos-latest
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Xcode version
-        run: xcodebuild -version
-
-      - name: Validate project
-        run: xcodebuild -project ios/Kyntral.xcodeproj -list
-
-      - name: Build iOS simulator app
-        run: >-
-          xcodebuild
-          -project ios/Kyntral.xcodeproj
-          -scheme Kyntral
-          -configuration Debug
-          -sdk iphonesimulator
-          CODE_SIGNING_ALLOWED=NO
-          build
-
-      - name: Select iPhone simulator
-        id: simulator
-        shell: bash
+      - name: Select latest installed Xcode
         run: |
-          DEVICE_ID="$(xcrun simctl list devices available -j | python3 -c 'import json,sys; data=json.load(sys.stdin)["devices"]; print(next(device["udid"] for devices in data.values() for device in devices if device.get("isAvailable") and "iPhone" in device.get("name", "")))')"
-          test -n "$DEVICE_ID"
-          echo "id=$DEVICE_ID" >> "$GITHUB_OUTPUT"
+          XCODE_PATH=$(ls -d /Applications/Xcode*.app | sort -V | tail -1)
+          sudo xcode-select -s "$XCODE_PATH/Contents/Developer"
+          xcodebuild -version
 
-      - name: Run XCTest conformance
-        run: >-
-          xcodebuild
-          -project ios/Kyntral.xcodeproj
-          -scheme Kyntral
-          -configuration Debug
-          -destination "platform=iOS Simulator,id=${{ steps.simulator.outputs.id }}"
-          CODE_SIGNING_ALLOWED=NO
-          test
+      - name: Build and test Kyntral iOS
+        run: |
+          xcodebuild \
+            -project ios/Kyntral.xcodeproj \
+            -scheme Kyntral \
+            -destination 'platform=iOS Simulator,name=iPhone 16' \
+            CODE_SIGNING_ALLOWED=NO \
+            test
