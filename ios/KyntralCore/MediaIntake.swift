@@ -87,22 +87,25 @@ public struct CobaltCompatibleResolver: MediaResolver {
             guard let picker = result.picker, !picker.isEmpty else {
                 throw CobaltResolverError.invalidResponse
             }
-            return picker.enumerated().compactMap { index, item in
-                guard let url = URL(string: item.url) else { return nil }
+            var result: [ResolvedMedia] = []
+            for (index, item) in picker.enumerated() {
+                guard let url = URL(string: item.url) else {
+                    throw CobaltResolverError.invalidResponse
+                }
                 let ext: String
                 switch item.type {
                 case "photo": ext = "jpg"
                 case "gif": ext = "gif"
                 default: ext = "mp4"
                 }
-                return ResolvedMedia(
-                    url: url,
-                    filename: "kyntral-" + String(index + 1) + "." + ext
+                result.append(
+                    ResolvedMedia(
+                        url: url,
+                        filename: "kyntral-" + String(index + 1) + "." + ext
+                    )
                 )
             }
-        case "local-processing":
-            throw CobaltResolverError.localProcessingUnsupported
-        case "error":
+            return result
             throw CobaltResolverError.remoteError(
                 result.error?.code ?? "unknown"
             )
