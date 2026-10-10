@@ -4,7 +4,7 @@
 
 Kyntral is a privacy-first permission layer between AI systems and user-owned devices. An AI can request a narrowly scoped capability; Kyntral verifies identity, device, scope, and authorization; the paired device executes under local operating-system controls; and the device returns a verifiable receipt.
 
-**Status:** pre-alpha architecture and implementation scaffold. Not production-ready.
+**Status:** **v0.1 release candidate implementation.** Core protocol, durable control plane, iOS device authority, KYN-W01, SDK/Builder prototypes, and release conformance exist. Production MCP deployment, live provider interoperability, active repository protections, TestFlight/physical-device evidence, legal approval, and launch assets remain release gates.
 
 ## Core invariants
 
@@ -23,9 +23,9 @@ The intended control plane handles opaque account/device/scope/capability/job me
 - **Kyntral Plugin** — portable OpenAI plugin package with skills and MCP configuration.
 - **Kyntral MCP** — model-neutral capability control plane.
 - **Kyntral iOS** — Swift/App Intents runtime for Siri and Shortcuts.
-- **Kyntral Builder** — planned visual workflow + authorization-policy builder.
+- **Kyntral Builder** — browser RC prototype for authoring Capability Manifest v1 declarations.
 - **Kyntral Protocol** — schemas, signing rules, receipts, and conformance vectors.
-- **Kyntral SDK / Registry** — planned community extension system.
+- **Kyntral SDK / Registry** — Apache-2.0 RC capability-manifest SDK plus prototype registry/certification model.
 
 ## Architecture
 
@@ -74,14 +74,34 @@ ChatGPT / Grok / MCP client
 
 ```text
 protocol/       public schemas and invariants
-control-plane/  MCP + authorization service scaffold
-ios/            iOS/App Intents scaffold
+control-plane/  durable MCP + OAuth authorization/resource service
+ios/            buildable iOS/App Intents device runtime
 skills/         agent workflow guidance
 conformance/    release-blocking tests
 docs/           architecture, threat model, integrations
 brand/          Kyntral brand system
 launch/         Product Hunt/release planning
 ```
+
+## Personal-device Shortcut
+
+Install the official shared Kyntral Shortcut on the iPhone or iPad you want to use with Kyntral:
+
+**[Install Kyntral Shortcut](https://www.icloud.com/shortcuts/effa6cac2e9b4702bed9128a8749e1f8)**
+
+Recommended onboarding flow:
+
+```text
+Install shared Shortcut
+-> open Kyntral on the personal device
+-> pair the device cryptographically
+-> configure KYN-W01 locally
+-> grant the exact local workflow
+-> Shortcut stages private media links locally
+-> signed Kyntral actions may execute that authorized workflow
+```
+
+The iCloud Shortcut link is a distribution/onboarding mechanism only. Installing it does **not** pair a device, grant Kyntral capabilities, or authorize arbitrary device control. Pairing and authorization remain separate Kyntral security operations.
 
 ## First conformance workflow
 
@@ -108,7 +128,15 @@ npm test
 npm run conformance
 ```
 
-The TypeScript server scaffold targets the current 2026 MCP TypeScript SDK line. The iOS directory contains Swift scaffolding to add to an Xcode project with App Intents enabled.
+The TypeScript control plane targets the current MCP TypeScript SDK line. The iOS directory contains a committed Xcode project with device identity, pairing, local policy, App Intents, KYN-W01, action verification, device request proofs, dedupe, retry-safe receipt journaling, and XCTest coverage.
+
+## RC landing preview
+
+A public v0.1 RC landing preview is deployed at:
+
+**https://kyntral-rc.vercel.app/**
+
+This is a product/onboarding preview only. It is **not** the production Kyntral MCP/API endpoint and is not evidence that the external release gates are complete.
 
 ## Plugin status
 

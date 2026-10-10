@@ -1,7 +1,7 @@
 {
   "name": "kyntral",
-  "version": "0.1.0-prealpha",
-  "description": "Permissioned AI-to-device execution.",
+  "version": "0.1.0-rc.1",
+  "description": "Kyntral v0.1 RC compatibility manifest for permissioned AI-to-device execution.",
   "skills": "./skills/",
   "mcpServers": "./mcp.json",
   "interface": {

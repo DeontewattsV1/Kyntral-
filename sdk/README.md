@@ -1,29 +1,49 @@
 # Kyntral SDK
 
-The Kyntral SDK surface is intended to make **capability compatibility open and portable** while keeping production authority explicit.
+SPDX-License-Identifier: Apache-2.0
 
-**License target:** Apache-2.0 for public protocol-facing SDK interfaces and examples.
+The Kyntral SDK makes the public capability contract portable without transferring runtime authority to an extension.
+
+## v0.1 RC surface
+
+The repository now includes a small TypeScript protocol-facing SDK under `sdk/src/`:
+
+- `CapabilityManifestV1`
+- K0–K4 risk types
+- execution-location types
+- device-data categories
+- network allowlist declarations
+- side-effect declarations
+- `assertCapabilityManifestV1()`
+- `parseCapabilityManifestV1()`
+
+The canonical JSON Schema remains `../protocol/schemas/capability-manifest.schema.json`. The SDK validator is a convenience implementation and must remain semantically aligned with that schema.
+
+## Examples
+
+- `examples/media-intake.capability.json` — KYN-W01 with local Notes/files data and allowlisted resolver access.
+- `examples/local-file-sort.capability.json` — local-only file organization with no network access.
 
 ## Extension contract
 
-A Kyntral extension should declare:
+A Kyntral extension declares:
 
-- stable publisher + capability identifier
-- required risk class
-- local/network execution boundary
-- data-access categories
-- allowed destinations/domains when applicable
-- whether background execution is supported
-- conformance status
+- stable publisher + capability identifier;
+- required K0–K4 risk;
+- execution location;
+- device-data categories;
+- network access and exact allowlist when applicable;
+- side effects;
+- approved destination identifiers where applicable.
 
-Extensions must never request a generic arbitrary-shell, arbitrary-URL, or unrestricted Shortcut capability.
-
-## Planned packages
+A manifest is descriptive policy input. It **never** creates a capability grant.
 
 ```text
-@kyntral/protocol
-@kyntral/sdk
-KyntralSwift
+manifest != registry certification != user grant != device authorization
 ```
 
-The protocol schemas in `../protocol/schemas/` are the current source of truth for serialized objects.
+Extensions must never request a generic arbitrary-shell, arbitrary-URL, unrestricted Shortcut, or equivalent catch-all capability.
+
+## Package status
+
+The package remains `private: true` during the v0.1 RC so the project does not accidentally publish an npm package before release provenance, package signing, and final API review are complete.

@@ -24,6 +24,12 @@ export function assertTemporalWindow(input: {
   const expiresMs = parseInstant(input.expiresAt, "expiresAt");
   const skew = input.clockSkewMs ?? MAX_CLOCK_SKEW_MS;
 
+  if (!Number.isFinite(nowMs)) throw new Error("now must be a valid timestamp");
+  if (!Number.isFinite(skew) || skew < 0 ||
+      !Number.isFinite(input.maxLifetimeMs) || input.maxLifetimeMs <= 0) {
+    throw new Error("invalid temporal policy");
+  }
+
   if (expiresMs <= issuedMs) {
     throw new Error("expiresAt must be after issuedAt");
   }

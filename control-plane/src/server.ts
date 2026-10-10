@@ -8,10 +8,15 @@ import {
 } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
 import {
+  Es256ActionSigner,
+  issueSignedAction
+} from "./action.js";
+import {
   PersistentAuthorizationStore,
   requireAllowed,
   type AuthorizationStore
 } from "./authorization.js";
+import type { ExecutionReceipt } from "./crypto.js";
 import {
   assertNoPrivatePayload,
   assertOpaqueId,
@@ -22,19 +27,21 @@ import {
   verifyAndConsumePairingProof,
   type PairingProof
 } from "./pairing.js";
-import {
-  type KyntralStore
-} from "./store.js";
+import { verifyAndStoreReceipt } from "./receipt.js";
+import type { KyntralStore } from "./store.js";
 
 export const KYNTRAL_SCOPES = {
   read: "kyntral.read",
   execute: "kyntral.execute",
+  deviceExecute: "kyntral.device.execute",
+  receiptSubmit: "kyntral.receipt.submit",
   pair: "kyntral.pair",
   revoke: "kyntral.revoke"
 } as const;
 
 type KyntralServerOptions = Readonly<{
   store: KyntralStore;
+  actionSigner: Es256ActionSigner;
   authorizationStore?: AuthorizationStore;
 }>;
 
@@ -81,6 +88,26 @@ function assertOwnsDevice(
   return device;
 }
 
+const executionReceiptSchema = z.object({
+  version: z.literal("kyntral.receipt.v1"),
+  receiptId: z.string().regex(/^[A-Za-z][A-Za-z0-9_-]{2,127}$/),
+  actionId: z.string().regex(/^[A-Za-z][A-Za-z0-9_-]{2,127}$/),
+  deviceId: z.string().regex(/^[A-Za-z][A-Za-z0-9_-]{2,127}$/),
+  actionHash: z.string().regex(/^sha256:[0-9a-f]{64}$/),
+  outcome: z.enum(["completed", "partial", "failed", "cancelled"]),
+  startedAt: z.string(),
+  completedAt: z.string(),
+  counts: z.object({
+    completed: z.number().int().nonnegative(),
+    failed: z.number().int().nonnegative()
+  }),
+  deviceProof: z.object({
+    keyId: z.string().min(3).max(128),
+    algorithm: z.literal("ES256"),
+    signature: z.string().regex(/^[A-Za-z0-9_-]+$/)
+  })
+});
+
 export function createKyntralServer(
   options: KyntralServerOptions
 ): McpServer {
@@ -99,7 +126,8 @@ export function createKyntralServer(
       instructions:
         "Kyntral mediates explicitly authorized work on paired devices. " +
         "AI proposal is not authorization; authorization is not execution; " +
-        "execution is not verification. Never request private workflow payloads."
+        "execution is not verification. Never request private workflow payloads. " +
+        "Treat completion as verified only after a device-signed receipt passes Kyntral verification."
     }
   );
 
@@ -179,7 +207,8 @@ export function createKyntralServer(
         supportedCapabilities: [
           { id: "workflow.preview", risk: "K0" },
           { id: "workflow.execute", risk: "K2" },
-          { id: "receipt.read", risk: "K0" }
+          { id: "receipt.read", risk: "K0" },
+          { id: "receipt.submit", risk: "K1" }
         ]
       });
     }
@@ -235,7 +264,7 @@ export function createKyntralServer(
     {
       title: "Queue authorized Kyntral workflow",
       description:
-        "Queue one exact opaque workflow after its principal-bound standing grant evaluates to Allowed.",
+        "Issue and persist one signed content-free ActionEnvelope only after the exact principal-bound grant evaluates to Allowed.",
       inputSchema: z.object({
         deviceId: z.string().min(3).max(128),
         scopeId: z.string().min(3).max(128),
@@ -264,6 +293,11 @@ export function createKyntralServer(
       requireAllowed(decision);
 
       const actionId = "act_" + randomUUID().replaceAll("-", "");
+      const issued = issueSignedAction({
+        actionId,
+        query,
+        signer: options.actionSigner
+      });
       const job = createCloudJob({
         actionId,
         deviceId: query.deviceId,
@@ -271,10 +305,13 @@ export function createKyntralServer(
         workflowId: query.workflowId,
         capability: query.capability,
         risk: query.risk,
-        expiresAt: new Date(Date.now() + 5 * 60_000).toISOString()
+        expiresAt: issued.action.expiresAt
       });
-      store.putJob(job);
-      return textResult(job);
+      store.putAuthorizedJob(job, issued);
+      return textResult({
+        job,
+        action: issued.action
+      });
     }
   );
 
@@ -332,11 +369,42 @@ export function createKyntralServer(
   );
 
   server.registerTool(
+    "kyntral_submit_receipt",
+    {
+      title: "Submit signed Kyntral execution receipt",
+      description:
+        "Submit a content-free device-signed receipt. Kyntral verifies the exact stored ActionEnvelope, device identity, authorization signature, timing, and receipt binding before updating job state.",
+      inputSchema: z.object({ receipt: executionReceiptSchema }),
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false
+      },
+      scopeChallenge: requireScopes(KYNTRAL_SCOPES.receiptSubmit),
+      _meta: securityMeta([KYNTRAL_SCOPES.receiptSubmit])
+    },
+    async ({ receipt }, ctx) => {
+      const principalId = requirePrincipal(ctx.http?.authInfo);
+      const result = verifyAndStoreReceipt({
+        store,
+        principalId,
+        receipt: receipt as ExecutionReceipt
+      });
+      return textResult({
+        status: result.status,
+        verified: true,
+        receipt: result.receipt
+      });
+    }
+  );
+
+  server.registerTool(
     "kyntral_get_receipt",
     {
       title: "Get Kyntral execution receipt",
       description:
-        "Read a content-free receipt actually submitted for an action owned by the authenticated principal.",
+        "Read a content-free receipt that has already passed Kyntral cryptographic verification for an action owned by the authenticated principal.",
       inputSchema: z.object({ actionId: z.string().min(3).max(128) }),
       annotations: {
         readOnlyHint: true,
@@ -444,7 +512,8 @@ export function createKyntralServer(
         deviceId: identity.deviceId,
         state: "paired",
         signingKeyId: identity.signingPublicKey.kid,
-        keyAgreementKeyId: identity.keyAgreementPublicKey.kid
+        keyAgreementKeyId: identity.keyAgreementPublicKey.kid,
+        authorizationSigningKey: options.actionSigner.publicKey
       });
     }
   );
@@ -454,7 +523,7 @@ export function createKyntralServer(
     {
       title: "Revoke paired device",
       description:
-        "Revoke an authenticated principal's paired device. Future authorization decisions for it fail as Revoked.",
+        "Revoke an authenticated principal's paired device. Future authorization decisions and receipt verification for it fail as Revoked.",
       inputSchema: z.object({ deviceId: z.string().min(3).max(128) }),
       annotations: {
         readOnlyHint: false,
@@ -480,4 +549,3 @@ export function createKyntralServer(
 
   return server;
 }
-

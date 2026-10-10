@@ -41,6 +41,7 @@ The ASCII purpose strings frozen in v1 are:
 - `action-authorization`
 - `execution-receipt`
 - `pairing-proof`
+- `device-request`
 
 ## Algorithms
 
@@ -49,6 +50,7 @@ Kyntral v1 uses:
 - authorization/action signatures: **ES256** (ECDSA P-256 + SHA-256)
 - device execution-receipt signatures: **ES256**
 - pairing proof signatures: **ES256**
+- device HTTP possession proofs: **ES256**
 - device key agreement: **ECDH P-256**
 - object hashes: **SHA-256**
 - signatures: ASN.1 DER encoded ECDSA signatures, then base64url without padding
@@ -84,12 +86,36 @@ Verification therefore requires all of the following:
 
 A valid receipt for action A is never evidence that action B executed.
 
+## Device request possession proof
+
+After pairing, device delivery and receipt-upload HTTP requests use
+`kyntral.device-request.v1`. The signed payload binds the paired device
+identity to the exact HTTP method, path, raw-body SHA-256 hash, one-time nonce,
+issue time, and expiry time.
+
+The proof is carried in the `X-Kyntral-Device-Proof` HTTP header as base64url
+of its JSON representation. JSON member ordering in the header is not
+authoritative; verification reconstructs the KCJ-1 unsigned projection.
+
+A device request proof:
+
+- has a maximum lifetime of 60 seconds;
+- permits at most 30 seconds of clock skew;
+- is signed by the already-paired device signing key;
+- MUST match the request method, path, and raw body hash exactly;
+- consumes its nonce durably after signature verification;
+- MUST NOT be accepted for another device, request body, route, or method.
+
+OAuth identifies the account and authorized client. The device request proof
+separately proves possession of the paired device signing key.
+
 ## Time rules
 
 Unless a later protocol version explicitly changes them:
 
 - maximum action lifetime: 5 minutes;
 - maximum pairing-challenge lifetime: 5 minutes;
+- maximum device-request lifetime: 60 seconds;
 - accepted clock skew: 60 seconds;
 - an `issuedAt` more than 60 seconds in the future is invalid;
 - an object is expired when current time is later than `expiresAt + 60 seconds`;
@@ -98,6 +124,11 @@ Unless a later protocol version explicitly changes them:
 
 ## Test vectors
 
-`protocol/test-vectors/crypto-v1.json` is normative for KCJ-1 ordering, action hashing, ES256 verification, receipt binding, distinct device identities, and ECDH shared-secret derivation.
+`protocol/test-vectors/crypto-v1.json` is normative for KCJ-1 ordering,
+action hashing, ES256 verification, receipt binding, distinct device identities,
+and ECDH shared-secret derivation.
+
+`protocol/test-vectors/device-request-v1.json` is normative for device-request
+canonicalization, method/path/body binding, and possession-proof verification.
 
 Private scalar values used to generate test vectors are test-only material and MUST NOT be reused in production.

@@ -1,0 +1,10 @@
+{
+  "name": "@kyntral/sdk",
+  "version": "0.1.0-rc.1",
+  "description": "Apache-2.0 protocol-facing SDK for Kyntral capability manifests.",
+  "type": "module",
+  "license": "Apache-2.0",
+  "exports": { ".": "./src/index.ts" },
+  "files": ["src", "README.md"],
+  "private": true
+}

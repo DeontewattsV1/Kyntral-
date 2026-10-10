@@ -3,11 +3,20 @@
 import { mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import { assertPairingTimeWindow } from "./time.js";
 import type {
   AuthorizationQuery,
   CapabilityGrantRecord
 } from "./authorization.js";
-import { assertNoPrivatePayload, type CloudJob, type CloudReceipt } from "./domain.js";
+import type {
+  P256PublicJwk,
+  SignedActionEnvelope
+} from "./crypto.js";
+import {
+  assertNoPrivatePayload,
+  type CloudJob,
+  type CloudReceipt
+} from "./domain.js";
 
 export type StoredPairingChallenge = Readonly<{
   challengeId: string;
@@ -26,11 +35,26 @@ export type StoredDevice = Readonly<{
   revokedAt: string | null;
 }>;
 
+export type StoredSignedAction = Readonly<{
+  action: SignedActionEnvelope;
+  authorizationKey: P256PublicJwk;
+  actionHash: string;
+}>;
+
+export type ClaimedDeviceAction = Readonly<{
+  job: CloudJob;
+  signedAction: StoredSignedAction;
+}>;
+
 export interface KyntralStore {
   putJob(job: CloudJob, now?: Date): void;
+  putAuthorizedJob(job: CloudJob, action: StoredSignedAction, now?: Date): void;
   getJob(actionId: string): CloudJob | null;
+  getSignedAction(actionId: string): StoredSignedAction | null;
+  claimNextAction(deviceId: string, now?: Date): ClaimedDeviceAction | null;
   updateJobState(actionId: string, state: CloudJob["state"]): CloudJob | null;
   putReceipt(receipt: CloudReceipt): void;
+  putVerifiedReceipt(receipt: CloudReceipt, state: CloudJob["state"]): void;
   getReceipt(actionId: string): CloudReceipt | null;
   consumeNonce(namespace: string, nonce: string, expiresAt: string, now?: Date): boolean;
   putPairingChallenge(challenge: StoredPairingChallenge): void;
@@ -50,6 +74,7 @@ const SCHEMA = [
   "PRAGMA foreign_keys = ON;",
   "PRAGMA journal_mode = WAL;",
   "CREATE TABLE IF NOT EXISTS jobs (action_id TEXT PRIMARY KEY, device_id TEXT NOT NULL, scope_id TEXT NOT NULL, workflow_id TEXT NOT NULL, capability TEXT NOT NULL, risk TEXT NOT NULL, state TEXT NOT NULL, expires_at TEXT NOT NULL, created_at TEXT NOT NULL);",
+  "CREATE TABLE IF NOT EXISTS signed_actions (action_id TEXT PRIMARY KEY, action_json TEXT NOT NULL, authorization_key_json TEXT NOT NULL, action_hash TEXT NOT NULL, nonce TEXT NOT NULL UNIQUE, issued_at TEXT NOT NULL, expires_at TEXT NOT NULL);",
   "CREATE TABLE IF NOT EXISTS receipts (action_id TEXT PRIMARY KEY, receipt_id TEXT NOT NULL UNIQUE, device_id TEXT NOT NULL, action_hash TEXT NOT NULL, state TEXT NOT NULL, completed INTEGER NOT NULL, failed INTEGER NOT NULL, completed_at TEXT NOT NULL, device_key_id TEXT NOT NULL, device_signature TEXT NOT NULL);",
   "CREATE TABLE IF NOT EXISTS consumed_nonces (namespace TEXT NOT NULL, nonce TEXT NOT NULL, expires_at TEXT NOT NULL, consumed_at TEXT NOT NULL, PRIMARY KEY (namespace, nonce));",
   "CREATE TABLE IF NOT EXISTS pairing_challenges (challenge_id TEXT PRIMARY KEY, principal_id TEXT NOT NULL, nonce TEXT NOT NULL, issued_at TEXT NOT NULL, expires_at TEXT NOT NULL, consumed_at TEXT);",
@@ -75,6 +100,38 @@ export class SqliteKyntralStore implements KyntralStore {
 
   putJob(job: CloudJob, now = new Date()): void {
     assertNoPrivatePayload(job);
+    this.insertJob(job, now);
+  }
+
+  putAuthorizedJob(
+    job: CloudJob,
+    action: StoredSignedAction,
+    now = new Date()
+  ): void {
+    assertNoPrivatePayload(job);
+    assertNoPrivatePayload(action);
+    this.#db.exec("BEGIN IMMEDIATE");
+    try {
+      this.insertJob(job, now);
+      this.#db.prepare(
+        "INSERT INTO signed_actions (action_id, action_json, authorization_key_json, action_hash, nonce, issued_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
+      ).run(
+        action.action.actionId,
+        JSON.stringify(action.action),
+        JSON.stringify(action.authorizationKey),
+        action.actionHash,
+        action.action.nonce,
+        action.action.issuedAt,
+        action.action.expiresAt
+      );
+      this.#db.exec("COMMIT");
+    } catch (error) {
+      this.#db.exec("ROLLBACK");
+      throw error;
+    }
+  }
+
+  private insertJob(job: CloudJob, now: Date): void {
     this.#db.prepare(
       "INSERT INTO jobs (action_id, device_id, scope_id, workflow_id, capability, risk, state, expires_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
     ).run(
@@ -100,6 +157,64 @@ export class SqliteKyntralStore implements KyntralStore {
     };
   }
 
+  getSignedAction(actionId: string): StoredSignedAction | null {
+    const row = this.#db.prepare(
+      "SELECT action_json, authorization_key_json, action_hash FROM signed_actions WHERE action_id = ?"
+    ).get(actionId) as Row | undefined;
+    if (!row) return null;
+    return {
+      action: JSON.parse(String(row.action_json)) as SignedActionEnvelope,
+      authorizationKey: JSON.parse(String(row.authorization_key_json)) as P256PublicJwk,
+      actionHash: String(row.action_hash)
+    };
+  }
+
+  claimNextAction(
+    deviceId: string,
+    now = new Date()
+  ): ClaimedDeviceAction | null {
+    const nowIso = now.toISOString();
+    this.#db.exec("BEGIN IMMEDIATE");
+    try {
+      let row = this.#db.prepare(
+        "SELECT action_id FROM jobs WHERE device_id = ? AND state = 'executing' AND expires_at >= ? ORDER BY created_at ASC LIMIT 1"
+      ).get(deviceId, nowIso) as Row | undefined;
+
+      if (!row) {
+        row = this.#db.prepare(
+          "SELECT action_id FROM jobs WHERE device_id = ? AND state = 'queued' AND expires_at >= ? ORDER BY created_at ASC LIMIT 1"
+        ).get(deviceId, nowIso) as Row | undefined;
+
+        if (row) {
+          const result = this.#db.prepare(
+            "UPDATE jobs SET state = 'executing' WHERE action_id = ? AND state = 'queued'"
+          ).run(String(row.action_id));
+          if (Number(result.changes) !== 1) {
+            throw new Error("device action claim lost");
+          }
+        }
+      }
+
+      if (!row) {
+        this.#db.exec("COMMIT");
+        return null;
+      }
+
+      const actionId = String(row.action_id);
+      const job = this.getJob(actionId);
+      const signedAction = this.getSignedAction(actionId);
+      if (!job || !signedAction) {
+        throw new Error("claimed action is incomplete");
+      }
+
+      this.#db.exec("COMMIT");
+      return { job, signedAction };
+    } catch (error) {
+      this.#db.exec("ROLLBACK");
+      throw error;
+    }
+  }
+
   updateJobState(actionId: string, state: CloudJob["state"]): CloudJob | null {
     this.#db.prepare("UPDATE jobs SET state = ? WHERE action_id = ?").run(state, actionId);
     return this.getJob(actionId);
@@ -107,6 +222,24 @@ export class SqliteKyntralStore implements KyntralStore {
 
   putReceipt(receipt: CloudReceipt): void {
     assertNoPrivatePayload(receipt);
+    this.insertReceipt(receipt);
+  }
+
+  putVerifiedReceipt(receipt: CloudReceipt, state: CloudJob["state"]): void {
+    assertNoPrivatePayload(receipt);
+    this.#db.exec("BEGIN IMMEDIATE");
+    try {
+      this.insertReceipt(receipt);
+      this.#db.prepare("UPDATE jobs SET state = ? WHERE action_id = ?")
+        .run(state, receipt.actionId);
+      this.#db.exec("COMMIT");
+    } catch (error) {
+      this.#db.exec("ROLLBACK");
+      throw error;
+    }
+  }
+
+  private insertReceipt(receipt: CloudReceipt): void {
     this.#db.prepare(
       "INSERT INTO receipts (action_id, receipt_id, device_id, action_hash, state, completed, failed, completed_at, device_key_id, device_signature) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
     ).run(
@@ -141,7 +274,9 @@ export class SqliteKyntralStore implements KyntralStore {
     expiresAt: string,
     now = new Date()
   ): boolean {
-    if (Date.parse(expiresAt) < now.getTime()) return false;
+    const expiresMs = Date.parse(expiresAt);
+    const nowMs = now.getTime();
+    if (!Number.isFinite(expiresMs) || !Number.isFinite(nowMs) || expiresMs < nowMs) return false;
     const result = this.#db.prepare(
       "INSERT OR IGNORE INTO consumed_nonces (namespace, nonce, expires_at, consumed_at) VALUES (?, ?, ?, ?)"
     ).run(namespace, nonce, expiresAt, now.toISOString());
@@ -174,9 +309,16 @@ export class SqliteKyntralStore implements KyntralStore {
   }
 
   consumePairingChallenge(challengeId: string, now = new Date()): boolean {
+    const challenge = this.getPairingChallenge(challengeId);
+    if (!challenge || challenge.consumedAt !== null) return false;
+    try {
+      assertPairingTimeWindow({ ...challenge, now });
+    } catch {
+      return false;
+    }
     const result = this.#db.prepare(
-      "UPDATE pairing_challenges SET consumed_at = ? WHERE challenge_id = ? AND consumed_at IS NULL AND expires_at >= ?"
-    ).run(now.toISOString(), challengeId, now.toISOString());
+      "UPDATE pairing_challenges SET consumed_at = ? WHERE challenge_id = ? AND consumed_at IS NULL"
+    ).run(now.toISOString(), challengeId);
     return Number(result.changes) === 1;
   }
 

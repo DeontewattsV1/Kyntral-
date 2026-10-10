@@ -1,51 +1,48 @@
 # Kyntral Builder
 
-Kyntral Builder is the planned visual authoring surface for **permissioned local workflows**.
+Kyntral Builder is the visual authoring surface for **permissioned capability declarations**.
 
-**Status:** design contract only; no production Builder implementation is present yet.
+**v0.1 RC status:** browser prototype implemented in this directory. It generates Capability Manifest v1 JSON; it does not create runtime grants or execute workflows.
+
+Open `index.html` in a browser to use the prototype.
 
 ## Design rule
 
-A Builder workflow declares capabilities and constraints. It does not grant itself authority.
-
 ```text
-workflow definition
+workflow/capability declaration
+      !=
+registry certification
       !=
 capability grant
       !=
 device authorization
 ```
 
-## Example
+The current prototype lets a developer select:
 
-```yaml
-version: kyntral.workflow.v1
-name: Media Intake
-execution:
-  location: device
-  background: allowed
-capabilities:
-  - notes.read.scoped
-  - network.media.resolve
-  - files.write.scoped
-privacy:
-  cloudContentAccess: none
-limits:
-  maxItems: 25
-destination:
-  id: dest_archive
-```
+- capability ID and module version;
+- publisher identity;
+- K0–K4 risk class;
+- execution location and background declaration;
+- device-data categories;
+- network allowlist;
+- side effects;
+- destination IDs.
 
-The cloud-facing representation should contain only the opaque workflow identifier and authorization metadata. Local selectors, filenames, Note contents, URLs, media bytes, and other private payloads stay on-device.
+It emits a `kyntral.capability.v1` manifest compatible with the public schema/SDK surface.
 
-## Planned surfaces
+## Privacy boundary
 
-- workflow graph editor
-- capability/risk inspector
-- standing-grant editor
-- local test runner
-- privacy-boundary preview
-- manifest export/import
-- conformance report
+The Builder should describe authority requirements, not ingest user workflow payloads. Local selectors, Notes contents, URLs, filenames, media bytes, and other private execution inputs should stay on-device whenever possible.
 
-Official Builder core is part of Kyntral Core and follows the repository license map.
+## RC limitations
+
+The prototype does not yet provide:
+
+- graphical node/edge workflow editing;
+- registry publishing;
+- live conformance execution in-browser;
+- user grant creation;
+- production account synchronization.
+
+Those are post-prototype features and must not be implied by the v0.1 RC UI.

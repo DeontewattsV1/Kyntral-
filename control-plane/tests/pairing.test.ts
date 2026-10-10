@@ -46,7 +46,7 @@ function keyPair(
 }
 
 describe("device pairing", () => {
-  it("accepts one valid proof and rejects challenge replay", () => {
+  it.each([0, 300_000, 360_000])("accepts one valid proof at offset %i and rejects challenge replay", (offset) => {
     store = new SqliteKyntralStore(":memory:");
     const now = new Date("2026-10-06T23:00:00.000Z");
     const challenge = createPairingChallenge(store, "usr_test_001", now);
@@ -85,12 +85,21 @@ describe("device pairing", () => {
       proof: { ...unsigned.proof, signature }
     };
 
+    const evaluationTime = new Date(now.getTime() + offset);
+    expect(() => verifyAndConsumePairingProof({
+      store: store!, principalId: "usr_test_001", proof, now: new Date(NaN)
+    })).toThrow(/valid timestamp/);
+    expect(store.getPairingChallenge(challenge.challengeId)?.consumedAt).toBeNull();
+    expect(() => verifyAndConsumePairingProof({
+      store: store!, principalId: "usr_test_001", proof, now: new Date(now.getTime() + 360_001)
+    })).toThrow(/expired/);
+
     expect(
       verifyAndConsumePairingProof({
         store,
         principalId: "usr_test_001",
         proof,
-        now
+        now: evaluationTime
       }).deviceId
     ).toBe(identity.deviceId);
 
@@ -99,7 +108,7 @@ describe("device pairing", () => {
         store: store!,
         principalId: "usr_test_001",
         proof,
-        now
+        now: evaluationTime
       })
     ).toThrow(/consumed|replay/i);
   });

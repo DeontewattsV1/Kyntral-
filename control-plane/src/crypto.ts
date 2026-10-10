@@ -103,7 +103,11 @@ export function canonicalizeJson(value: CanonicalJson): string {
 }
 
 export function signingPreimage(
-  purpose: "action-authorization" | "execution-receipt" | "pairing-proof",
+  purpose:
+    | "action-authorization"
+    | "execution-receipt"
+    | "pairing-proof"
+    | "device-request",
   value: CanonicalJson
 ): Buffer {
   const prefix = Buffer.from(`KYNTRAL\0${purpose}\0v1\0`, "utf8");

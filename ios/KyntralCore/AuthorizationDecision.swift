@@ -2,8 +2,6 @@
 
 import Foundation
 
-/// Authorization states are intentionally non-collapsible.
-/// Only `allowed` permits execution.
 public enum AuthorizationDecision: String, Codable, Sendable {
     case allowed = "Allowed"
     case denied = "Denied"
