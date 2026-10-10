@@ -42,8 +42,12 @@ form.addEventListener("submit", (event) => {
 });
 
 copy.addEventListener("click", async () => {
-  await navigator.clipboard.writeText(output.textContent);
-  copy.textContent = "Copied";
+  try {
+    await navigator.clipboard.writeText(output.textContent);
+    copy.textContent = "Copied";
+  } catch {
+    copy.textContent = "Copy failed";
+  }
   setTimeout(() => { copy.textContent = "Copy JSON"; }, 1200);
 });
 
