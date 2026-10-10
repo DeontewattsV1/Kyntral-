@@ -13,16 +13,19 @@ struct RunKyntralWorkflowIntent: AppIntent {
     var workflowID: String
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
-        guard let workflow = await LocalWorkflowRegistry.shared.workflow(id: workflowID) else {
-            return .result(dialog: "That Kyntral workflow is not configured on this device.")
+        let state = await KyntralRuntime.shared.workflowState(id: workflowID)
+        guard let workflow = state.workflow else {
+            return .result(
+                dialog: "That Kyntral workflow is not configured on this device."
+            )
         }
-        let decision = await LocalWorkflowRegistry.shared.decision(
-            workflowId: workflowID,
-            capability: workflow.capability
+        guard state.decision.permitsExecution else {
+            return .result(
+                dialog: "Kyntral did not authorize \(workflow.id). Current state: \(state.decision.rawValue)."
+            )
+        }
+        return .result(
+            dialog: "Kyntral validated local authorization for \(workflow.id)."
         )
-        guard decision.permitsExecution else {
-            return .result(dialog: "Kyntral did not authorize this workflow. Current state: \(decision.rawValue).")
-        }
-        return .result(dialog: "Kyntral validated the local authorization for \(workflowID).")
     }
 }

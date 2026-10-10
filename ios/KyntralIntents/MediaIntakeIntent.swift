@@ -13,7 +13,7 @@ struct MediaIntakeIntent: AppIntent {
     @Parameter(title: "URLs")
     var urls: [URL]
 
-    @Parameter(title: "Workflow ID")
+    @Parameter(title: "Workflow ID", default: "wf_media_intake")
     var workflowID: String
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
