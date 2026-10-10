@@ -5,6 +5,8 @@ import SwiftUI
 @main
 struct KyntralApp: App {
     var body: some Scene {
-        WindowGroup { ContentView() }
+        WindowGroup {
+            ContentView()
+        }
     }
 }
