@@ -15,8 +15,14 @@ final class KyntralCoreTests: XCTestCase {
             ])
         ])
         XCTAssertEqual(
-            try KCJCanonicalizer.string(value),
-            "{\"a\":1,\"nested\":{\"a\":null,\"b\":true},\"z\":2}"
+            DedupeLedger.sourceHash(first),
+            DedupeLedger.sourceHash(second)
+        )
+        let third = URL(string: "https://example.com/media?id=2#one")!
+        let fourth = URL(string: "https://example.com/media?id=2#two")!
+        XCTAssertEqual(
+            DedupeLedger.sourceHash(third),
+            DedupeLedger.sourceHash(fourth)
         )
     }
 
