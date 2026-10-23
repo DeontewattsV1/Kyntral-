@@ -10,5 +10,8 @@
     "skipLibCheck": true,
     "outDir": "../dist"
   },
-  "include": ["src/**/*.ts", "tests/**/*.ts", "../conformance/**/*.ts"]
+  "include": [
+    "src/**/*.ts",
+    "tests/**/*.ts"
+  ]
 }
