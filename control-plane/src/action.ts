@@ -4,7 +4,6 @@ import {
   createPrivateKey,
   randomBytes,
   sign as signMessage,
-  type JsonWebKey,
   type KeyObject
 } from "node:crypto";
 import type { AuthorizationQuery } from "./authorization.js";
