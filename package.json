@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Privacy-first permission layer between AI systems and user-owned devices.",
   "scripts": {
-    "typecheck": "tsc -p control-plane/tsconfig.json --noEmit",
+    "typecheck": "tsc -p control-plane/tsconfig.json --noEmit && tsc -p tsconfig.conformance.json --noEmit",
     "build": "tsc -p control-plane/tsconfig.json",
     "test": "vitest run control-plane/tests",
     "conformance": "vitest run conformance",
