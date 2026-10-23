@@ -3,8 +3,7 @@
 import {
   createHash,
   createPublicKey,
-  verify as verifySignature,
-  type JsonWebKey
+  verify as verifySignature
 } from "node:crypto";
 
 export type CanonicalJson =
