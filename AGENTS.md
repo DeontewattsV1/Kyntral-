@@ -40,3 +40,12 @@ Honor the directory-level license map in `LICENSE`. New protocol/conformance/SDK
 ## Security reviews
 
 Changes to authentication, authorization, cryptography, device pairing, receipt verification, privacy boundaries, MCP write tools, or registry trust require security-focused review before release.
+
+## Cursor Cloud specific instructions
+
+- Install with `npm install`. This repository has no lockfile, so `npm ci` does not apply.
+- Node.js 22 or newer is required. The control plane uses built-in `node:sqlite`; the experimental SQLite warning during tests is expected.
+- `npm test`, `npm run conformance`, and `npm run security:audit` are the working checks. `npm run typecheck` currently fails on TypeScript 7.0.2 with TS6059 because `control-plane/tsconfig.json` includes `../conformance/**/*.ts` outside the inferred `rootDir`.
+- The control plane is an in-process HTTP handler. It does not listen on a development port. Exercise it through the Vitest suites.
+- `builder/index.html` is the static Capability Manifest prototype. The Cloud Agent start command serves that directory at `http://127.0.0.1:4173/`.
+- `ios/` builds with Xcode on macOS (`xcodebuild` in `.github/workflows/ios.yml`). It is outside the Linux Cloud Agent loop.
