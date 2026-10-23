@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 
 import {
-  generateKeyPairSync,
-  type JsonWebKey
+  generateKeyPairSync
 } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import {
