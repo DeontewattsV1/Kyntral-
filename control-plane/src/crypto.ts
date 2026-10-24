@@ -3,8 +3,7 @@
 import {
   createHash,
   createPublicKey,
-  verify as verifySignature,
-  type JsonWebKey
+  verify as verifySignature
 } from "node:crypto";
 
 export type CanonicalJson =
@@ -127,7 +126,7 @@ export function decodeBase64Url(value: string): Buffer {
   return Buffer.from(value, "base64url");
 }
 
-function toNodeJwk(jwk: P256PublicJwk): JsonWebKey {
+function toNodeJwk(jwk: P256PublicJwk): JsonWebKey & { kid: string } {
   return {
     kty: jwk.kty,
     crv: jwk.crv,

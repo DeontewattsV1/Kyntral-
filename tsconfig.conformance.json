@@ -1,0 +1,11 @@
+{
+  "extends": "./control-plane/tsconfig.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "noEmit": true
+  },
+  "include": [
+    "conformance/**/*.ts",
+    "control-plane/src/**/*.ts"
+  ]
+}

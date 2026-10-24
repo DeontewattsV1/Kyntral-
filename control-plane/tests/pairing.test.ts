@@ -3,7 +3,6 @@
 import {
   generateKeyPairSync,
   sign,
-  type JsonWebKey,
   type KeyObject
 } from "node:crypto";
 import { afterEach, describe, expect, it } from "vitest";
