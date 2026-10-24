@@ -4,7 +4,6 @@ import { readFileSync } from "node:fs";
 import {
   generateKeyPairSync,
   sign,
-  type JsonWebKey,
   type KeyObject
 } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
