@@ -36,9 +36,18 @@ jobs:
 
       - name: Build and test Kyntral iOS
         run: |
+          set -euo pipefail
+          SIMULATOR_ID="$(xcrun simctl list devices available -j | jq -r '[.devices[][] | select(.isAvailable == true and (.name | startswith("iPhone"))) | .udid][0] // empty')"
+          if [[ -z "$SIMULATOR_ID" ]]; then
+            echo "No available iPhone simulator for the selected Xcode toolchain" >&2
+            xcrun simctl list devices available
+            exit 1
+          fi
+          echo "Testing on iPhone simulator: $SIMULATOR_ID"
           xcodebuild \
             -project ios/Kyntral.xcodeproj \
             -scheme Kyntral \
-            -destination 'platform=iOS Simulator,name=iPhone 16' \
-            CODE_SIGNING_ALLOWED=NO \
+            -destination "platform=iOS Simulator,id=$SIMULATOR_ID" \
+            CODE_SIGNING_ALLOWED=YES \
+            CODE_SIGN_IDENTITY=- \
             test

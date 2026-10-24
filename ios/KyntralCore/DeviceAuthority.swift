@@ -75,7 +75,7 @@ public enum KCJCanonicalizer {
         case .string(let value):
             return quote(value.precomposedStringWithCanonicalMapping)
         case .array(let values):
-            return "[" + try values.map(string).joined(separator: ",") + "]"
+            return "[" + (try values.map(string).joined(separator: ",")) + "]"
         case .object(let object):
             var normalized: [String: KCJValue] = [:]
             for (key, value) in object {

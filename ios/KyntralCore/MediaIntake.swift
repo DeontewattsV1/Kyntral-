@@ -106,6 +106,7 @@ public struct CobaltCompatibleResolver: MediaResolver {
                 )
             }
             return result
+        case "error":
             throw CobaltResolverError.remoteError(
                 result.error?.code ?? "unknown"
             )
