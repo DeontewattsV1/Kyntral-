@@ -275,9 +275,14 @@ public actor KyntralRuntime {
         }
 
         var stale = false
+#if os(macOS)
+        let bookmarkOptions: URL.BookmarkResolutionOptions = [.withSecurityScope]
+#else
+        let bookmarkOptions: URL.BookmarkResolutionOptions = []
+#endif
         let destination = try URL(
             resolvingBookmarkData: bookmark,
-            options: [.withSecurityScope],
+            options: bookmarkOptions,
             relativeTo: nil,
             bookmarkDataIsStale: &stale
         )
