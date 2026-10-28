@@ -121,6 +121,7 @@ public actor KyntralRuntime {
         let decision = await registry.decision(
             workflowId: id,
             capability: workflow.capability,
+            risk: workflow.risk,
             scopeId: scopeId
         )
         return (workflow, decision)
@@ -137,6 +138,7 @@ public actor KyntralRuntime {
         let decision = await registry.decision(
             workflowId: workflowId,
             capability: workflow.capability,
+            risk: workflow.risk,
             scopeId: scopeId
         )
         guard decision.permitsExecution else {

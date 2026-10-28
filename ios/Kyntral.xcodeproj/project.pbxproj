@@ -6,18 +6,32 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		A00000000000000000000001 /* KyntralApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000001 /* KyntralApp.swift */; };
-		A00000000000000000000002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000002 /* ContentView.swift */; };
-		A00000000000000000000003 /* AuthorizationDecision.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000003 /* AuthorizationDecision.swift */; };
-		A00000000000000000000004 /* KyntralCapability.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000004 /* KyntralCapability.swift */; };
-		A00000000000000000000005 /* DeviceAuthority.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000005 /* DeviceAuthority.swift */; };
-		A00000000000000000000006 /* LocalWorkflowRuntime.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000006 /* LocalWorkflowRuntime.swift */; };
-		A00000000000000000000007 /* MediaIntake.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000007 /* MediaIntake.swift */; };
-		A00000000000000000000008 /* ReceiptSigner.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000008 /* ReceiptSigner.swift */; };
-		A00000000000000000000009 /* RunKyntralWorkflowIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000009 /* RunKyntralWorkflowIntent.swift */; };
-		A0000000000000000000000A /* MediaIntakeIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000000A /* MediaIntakeIntent.swift */; };
-		A0000000000000000000000B /* KyntralAppShortcuts.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000000B /* KyntralAppShortcuts.swift */; };
-		A0000000000000000000000C /* KyntralCoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000000C /* KyntralCoreTests.swift */; };
+		A00000000000000000000100 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000100 /* ContentView.swift */; };
+		A00000000000000000000101 /* KyntralApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000101 /* KyntralApp.swift */; };
+		A00000000000000000000102 /* AuthorizationDecision.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000102 /* AuthorizationDecision.swift */; };
+		A00000000000000000000103 /* CobaltResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000103 /* CobaltResolver.swift */; };
+		A00000000000000000000104 /* DedupeLedger.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000104 /* DedupeLedger.swift */; };
+		A00000000000000000000105 /* DeviceExecutionClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000105 /* DeviceExecutionClient.swift */; };
+		A00000000000000000000106 /* DeviceKeyManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000106 /* DeviceKeyManager.swift */; };
+		A00000000000000000000107 /* ExecutionJournal.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000107 /* ExecutionJournal.swift */; };
+		A00000000000000000000108 /* KCJCanonicalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000108 /* KCJCanonicalizer.swift */; };
+		A00000000000000000000109 /* KyntralCapability.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000109 /* KyntralCapability.swift */; };
+		A0000000000000000000010A /* KyntralRuntime.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000010A /* KyntralRuntime.swift */; };
+		A0000000000000000000010B /* LocalWorkflowInbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000010B /* LocalWorkflowInbox.swift */; };
+		A0000000000000000000010C /* LocalWorkflowRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000010C /* LocalWorkflowRegistry.swift */; };
+		A0000000000000000000010D /* MediaIntakeWorkflow.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000010D /* MediaIntakeWorkflow.swift */; };
+		A0000000000000000000010E /* PairingProofBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000010E /* PairingProofBuilder.swift */; };
+		A0000000000000000000010F /* ReceiptSigner.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000010F /* ReceiptSigner.swift */; };
+		A00000000000000000000110 /* KyntralAppShortcuts.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000110 /* KyntralAppShortcuts.swift */; };
+		A00000000000000000000111 /* MediaIntakeIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000111 /* MediaIntakeIntent.swift */; };
+		A00000000000000000000112 /* RunKyntralWorkflowIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000112 /* RunKyntralWorkflowIntent.swift */; };
+		A00000000000000000000113 /* StageMediaIntakeIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000113 /* StageMediaIntakeIntent.swift */; };
+		A00000000000000000000114 /* AuthorizationDecisionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000114 /* AuthorizationDecisionTests.swift */; };
+		A00000000000000000000115 /* DedupeLedgerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000115 /* DedupeLedgerTests.swift */; };
+		A00000000000000000000116 /* ExecutionJournalTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000116 /* ExecutionJournalTests.swift */; };
+		A00000000000000000000117 /* KCJCanonicalizerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000117 /* KCJCanonicalizerTests.swift */; };
+		A00000000000000000000118 /* KyntralCoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000118 /* KyntralCoreTests.swift */; };
+		A00000000000000000000119 /* LocalWorkflowInboxTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000119 /* LocalWorkflowInboxTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -31,18 +45,33 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		B00000000000000000000001 /* KyntralApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KyntralApp.swift; sourceTree = "<group>"; };
-		B00000000000000000000002 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
-		B00000000000000000000003 /* AuthorizationDecision.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthorizationDecision.swift; sourceTree = "<group>"; };
-		B00000000000000000000004 /* KyntralCapability.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KyntralCapability.swift; sourceTree = "<group>"; };
-		B00000000000000000000005 /* DeviceAuthority.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceAuthority.swift; sourceTree = "<group>"; };
-		B00000000000000000000006 /* LocalWorkflowRuntime.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalWorkflowRuntime.swift; sourceTree = "<group>"; };
-		B00000000000000000000007 /* MediaIntake.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaIntake.swift; sourceTree = "<group>"; };
-		B00000000000000000000008 /* ReceiptSigner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReceiptSigner.swift; sourceTree = "<group>"; };
-		B00000000000000000000009 /* RunKyntralWorkflowIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunKyntralWorkflowIntent.swift; sourceTree = "<group>"; };
-		B0000000000000000000000A /* MediaIntakeIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaIntakeIntent.swift; sourceTree = "<group>"; };
-		B0000000000000000000000B /* KyntralAppShortcuts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KyntralAppShortcuts.swift; sourceTree = "<group>"; };
-		B0000000000000000000000C /* KyntralCoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KyntralCoreTests.swift; sourceTree = "<group>"; };
+		B00000000000000000000100 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		B00000000000000000000101 /* KyntralApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KyntralApp.swift; sourceTree = "<group>"; };
+		B00000000000000000000102 /* AuthorizationDecision.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthorizationDecision.swift; sourceTree = "<group>"; };
+		B00000000000000000000103 /* CobaltResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CobaltResolver.swift; sourceTree = "<group>"; };
+		B00000000000000000000104 /* DedupeLedger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DedupeLedger.swift; sourceTree = "<group>"; };
+		B00000000000000000000105 /* DeviceExecutionClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceExecutionClient.swift; sourceTree = "<group>"; };
+		B00000000000000000000106 /* DeviceKeyManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceKeyManager.swift; sourceTree = "<group>"; };
+		B00000000000000000000107 /* ExecutionJournal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExecutionJournal.swift; sourceTree = "<group>"; };
+		B00000000000000000000108 /* KCJCanonicalizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KCJCanonicalizer.swift; sourceTree = "<group>"; };
+		B00000000000000000000109 /* KyntralCapability.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KyntralCapability.swift; sourceTree = "<group>"; };
+		B0000000000000000000010A /* KyntralRuntime.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KyntralRuntime.swift; sourceTree = "<group>"; };
+		B0000000000000000000010B /* LocalWorkflowInbox.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalWorkflowInbox.swift; sourceTree = "<group>"; };
+		B0000000000000000000010C /* LocalWorkflowRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalWorkflowRegistry.swift; sourceTree = "<group>"; };
+		B0000000000000000000010D /* MediaIntakeWorkflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaIntakeWorkflow.swift; sourceTree = "<group>"; };
+		B0000000000000000000010E /* PairingProofBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairingProofBuilder.swift; sourceTree = "<group>"; };
+		B0000000000000000000010F /* ReceiptSigner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReceiptSigner.swift; sourceTree = "<group>"; };
+		B00000000000000000000110 /* KyntralAppShortcuts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KyntralAppShortcuts.swift; sourceTree = "<group>"; };
+		B00000000000000000000111 /* MediaIntakeIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaIntakeIntent.swift; sourceTree = "<group>"; };
+		B00000000000000000000112 /* RunKyntralWorkflowIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunKyntralWorkflowIntent.swift; sourceTree = "<group>"; };
+		B00000000000000000000113 /* StageMediaIntakeIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StageMediaIntakeIntent.swift; sourceTree = "<group>"; };
+		B00000000000000000000114 /* AuthorizationDecisionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthorizationDecisionTests.swift; sourceTree = "<group>"; };
+		B00000000000000000000115 /* DedupeLedgerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DedupeLedgerTests.swift; sourceTree = "<group>"; };
+		B00000000000000000000116 /* ExecutionJournalTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExecutionJournalTests.swift; sourceTree = "<group>"; };
+		B00000000000000000000117 /* KCJCanonicalizerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KCJCanonicalizerTests.swift; sourceTree = "<group>"; };
+		B00000000000000000000118 /* KyntralCoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KyntralCoreTests.swift; sourceTree = "<group>"; };
+		B00000000000000000000119 /* LocalWorkflowInboxTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalWorkflowInboxTests.swift; sourceTree = "<group>"; };
+
 		B0000000000000000000000D /* Kyntral.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Kyntral.entitlements; sourceTree = "<group>"; };
 		B0000000000000000000000E /* Kyntral.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Kyntral.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B0000000000000000000000F /* KyntralTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = KyntralTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -66,10 +95,10 @@
 			);
 			sourceTree = "<group>";
 		};
-		G00000000000000000000002 /* KyntralApp */ = {isa = PBXGroup; children = (B00000000000000000000001, B00000000000000000000002); path = KyntralApp; sourceTree = "<group>"; };
-		G00000000000000000000003 /* KyntralCore */ = {isa = PBXGroup; children = (B00000000000000000000003, B00000000000000000000004, B00000000000000000000005, B00000000000000000000006, B00000000000000000000007, B00000000000000000000008); path = KyntralCore; sourceTree = "<group>"; };
-		G00000000000000000000004 /* KyntralIntents */ = {isa = PBXGroup; children = (B00000000000000000000009, B0000000000000000000000A, B0000000000000000000000B); path = KyntralIntents; sourceTree = "<group>"; };
-		G00000000000000000000005 /* KyntralTests */ = {isa = PBXGroup; children = (B0000000000000000000000C); path = KyntralTests; sourceTree = "<group>"; };
+		G00000000000000000000002 /* KyntralApp */ = {isa = PBXGroup; children = (B00000000000000000000100, B00000000000000000000101); path = KyntralApp; sourceTree = "<group>"; };
+		G00000000000000000000003 /* KyntralCore */ = {isa = PBXGroup; children = (B00000000000000000000102, B00000000000000000000103, B00000000000000000000104, B00000000000000000000105, B00000000000000000000106, B00000000000000000000107, B00000000000000000000108, B00000000000000000000109, B0000000000000000000010A, B0000000000000000000010B, B0000000000000000000010C, B0000000000000000000010D, B0000000000000000000010E, B0000000000000000000010F); path = KyntralCore; sourceTree = "<group>"; };
+		G00000000000000000000004 /* KyntralIntents */ = {isa = PBXGroup; children = (B00000000000000000000110, B00000000000000000000111, B00000000000000000000112, B00000000000000000000113); path = KyntralIntents; sourceTree = "<group>"; };
+		G00000000000000000000005 /* KyntralTests */ = {isa = PBXGroup; children = (B00000000000000000000114, B00000000000000000000115, B00000000000000000000116, B00000000000000000000117, B00000000000000000000118, B00000000000000000000119); path = KyntralTests; sourceTree = "<group>"; };
 		G00000000000000000000006 /* Products */ = {isa = PBXGroup; children = (B0000000000000000000000E, B0000000000000000000000F); name = Products; sourceTree = "<group>"; };
 /* End PBXGroup section */
 
@@ -129,13 +158,8 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		S00000000000000000000001 = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (A00000000000000000000001, A00000000000000000000002, A00000000000000000000003, A00000000000000000000004, A00000000000000000000005, A00000000000000000000006, A00000000000000000000007, A00000000000000000000008, A00000000000000000000009, A0000000000000000000000A, A0000000000000000000000B);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		S00000000000000000000002 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A0000000000000000000000C); runOnlyForDeploymentPostprocessing = 0; };
+		S00000000000000000000001 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A00000000000000000000100, A00000000000000000000101, A00000000000000000000102, A00000000000000000000103, A00000000000000000000104, A00000000000000000000105, A00000000000000000000106, A00000000000000000000107, A00000000000000000000108, A00000000000000000000109, A0000000000000000000010A, A0000000000000000000010B, A0000000000000000000010C, A0000000000000000000010D, A0000000000000000000010E, A0000000000000000000010F, A00000000000000000000110, A00000000000000000000111, A00000000000000000000112, A00000000000000000000113); runOnlyForDeploymentPostprocessing = 0; };
+		S00000000000000000000002 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A00000000000000000000114, A00000000000000000000115, A00000000000000000000116, A00000000000000000000117, A00000000000000000000118, A00000000000000000000119); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */

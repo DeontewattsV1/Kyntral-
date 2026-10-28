@@ -2,7 +2,7 @@
 
 import Foundation
 
-public struct MediaIntakeResult: Sendable {
+public struct MediaIntakeResult: Sendable, Equatable {
     public let completed: Int
     public let duplicates: Int
     public let failed: Int

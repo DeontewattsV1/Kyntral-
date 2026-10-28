@@ -4,7 +4,7 @@ import { generateKeyPairSync } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Es256ActionSigner, type P256PrivateJwk } from "../src/action.js";
 import { createKyntralHttpHandler, type KyntralHttpConfig } from "../src/http.js";
-import { deriveOpaquePrincipalId } from "../src/oauth.js";
+import { deriveOpaquePrincipalId, type OAuthIntrospection } from "../src/oauth.js";
 import { KYNTRAL_SCOPES } from "../src/server.js";
 import { SqliteKyntralStore } from "../src/store.js";
 
@@ -13,7 +13,10 @@ const issuer = new URL("https://identity.example.test/");
 const stores: SqliteKyntralStore[] = [];
 afterEach(() => { for (const store of stores.splice(0)) store.close(); });
 
-function config(scopes: string[], active = true, expiresIn = 300): KyntralHttpConfig {
+function config(
+  scopes: string[], active = true, expiresIn = 300,
+  claims: Partial<OAuthIntrospection> = {}
+): KyntralHttpConfig {
   const pair = generateKeyPairSync("ec", { namedCurve: "P-256" });
   const jwk = pair.privateKey.export({ format: "jwk" }) as JsonWebKey;
   const actionSigner = new Es256ActionSigner({
@@ -33,9 +36,33 @@ function config(scopes: string[], active = true, expiresIn = 300): KyntralHttpCo
     oauthFetch: vi.fn(async () => Response.json({
       active, client_id: "test-client", scope: scopes.join(" "),
       exp: Math.floor(Date.now() / 1000) + expiresIn,
-      sub: "private-test-subject", aud: resource.href, iss: issuer.href
+      sub: "private-test-subject", aud: resource.href, iss: issuer.href,
+      ...claims
     })) as unknown as typeof fetch
   };
+}
+
+function allowWorkflow(settings: KyntralHttpConfig) {
+  const args = {
+    deviceId: "dev_test_001", scopeId: "scope_test_001",
+    workflowId: "wf_test_001"
+  };
+  const store = settings.store as SqliteKyntralStore;
+  const now = new Date();
+  const principalId = deriveOpaquePrincipalId(issuer, "private-test-subject");
+  store.putDevice({
+    deviceId: args.deviceId, principalId,
+    identityJson: JSON.stringify({ deviceId: args.deviceId }),
+    createdAt: now.toISOString(), revokedAt: null
+  });
+  store.putCapabilityGrant({
+    grantId: "grant_test_001", principalId, ...args,
+    capability: "workflow.execute", risk: "K2", status: "Allowed",
+    issuedAt: new Date(now.getTime() - 1000).toISOString(),
+    expiresAt: new Date(now.getTime() + 60_000).toISOString(),
+    revokedAt: null
+  });
+  return args;
 }
 type RpcReply = {
   jsonrpc: string; id?: number;
@@ -60,7 +87,10 @@ async function rpc(
       "content-type": "application/json",
       accept: "application/json, text/event-stream",
       "mcp-protocol-version": protocolVersion,
-      ...(protocolVersion === "2026-07-28" && method !== "initialize" ? { "mcp-method": method } : {})
+      ...(protocolVersion === "2026-07-28" && method !== "initialize" ? {
+        "mcp-method": method,
+        ...(typeof params.name === "string" ? { "mcp-name": params.name } : {})
+      } : {})
     },
     body: JSON.stringify({ jsonrpc: "2.0", id: 7, method, params: protocolVersion === "2026-07-28" ? { ...params, _meta: { "io.modelcontextprotocol/protocolVersion": protocolVersion, "io.modelcontextprotocol/clientCapabilities": {} } } : params })
   }));
@@ -129,20 +159,74 @@ describe("MCP SDK 2.4.0 HTTP transport and authorization", () => {
   });
   it("prevents queueing without execution scope", async () => {
     const settings = config([KYNTRAL_SCOPES.read]);
+    const args = allowWorkflow(settings);
     const store = settings.store as SqliteKyntralStore;
     const put = vi.spyOn(store, "putAuthorizedJob");
     const handler = createKyntralHttpHandler(settings);
-    const { response, body } = await rpc(handler, "tools/call", {
+    const { response } = await rpc(handler, "tools/call", {
       name: "kyntral_queue_workflow",
-      arguments: {
-        deviceId: "dev_test_001", scopeId: "scope_test_001",
-        workflowId: "wf_test_001"
-      }
+      arguments: args
     });
-    expect(response.status === 403 || body.error !== undefined ||
-      (body.result as { isError?: boolean } | undefined)?.isError === true).toBe(true);
+    expect(response.status).toBe(403);
+    expect(response.headers.get("www-authenticate")).toContain("kyntral.execute");
     expect(put).not.toHaveBeenCalled();
   });
+  for (const protocol of ["2025-11-25", "2026-07-28"]) {
+    it("queues one signed action with exact grant and execute scope on " + protocol, async () => {
+      const settings = config([KYNTRAL_SCOPES.execute]);
+      const args = allowWorkflow(settings);
+      const store = settings.store as SqliteKyntralStore;
+      const put = vi.spyOn(store, "putAuthorizedJob");
+      const { response, body } = await rpc(createKyntralHttpHandler(settings), "tools/call", {
+        name: "kyntral_queue_workflow", arguments: args
+      }, protocol);
+      expect(response.status, JSON.stringify(body)).toBe(200);
+      expect(body.error).toBeUndefined();
+      expect(body.result?.isError).not.toBe(true);
+      expect(put).toHaveBeenCalledTimes(1);
+      const result = body.result?.structuredContent as {
+        job: { actionId: string }; action: { authorizationProof: { algorithm: string } }
+      };
+      expect(result.action.authorizationProof.algorithm).toBe("ES256");
+      expect(store.getJob(result.job.actionId)).toMatchObject(args);
+    });
+  }
+  for (const scenario of ["missing grant", "wrong scope", "revoked device", "foreign principal"]) {
+    it("does not queue with execute scope but " + scenario, async () => {
+      const settings = config([KYNTRAL_SCOPES.execute]);
+      const args = allowWorkflow(settings);
+      const store = settings.store as SqliteKyntralStore;
+      if (scenario === "missing grant") args.workflowId = "wf_ungranted_001";
+      if (scenario === "wrong scope") args.scopeId = "scope_wrong_001";
+      if (scenario === "revoked device") store.revokeDevice(args.deviceId);
+      if (scenario === "foreign principal") {
+        const device = store.getDevice(args.deviceId)!;
+        store.putDevice({ ...device, principalId: "usr_foreign_001" });
+      }
+      const put = vi.spyOn(store, "putAuthorizedJob");
+      const { response, body } = await rpc(createKyntralHttpHandler(settings), "tools/call", {
+        name: "kyntral_queue_workflow", arguments: args
+      });
+      expect(response.status).toBe(200);
+      expect(body.result?.isError).toBe(true);
+      expect(put).not.toHaveBeenCalled();
+    });
+  }
+  for (const claims of [
+    { aud: "https://other.example.test/mcp" },
+    { iss: "https://other-identity.example.test/" }
+  ]) {
+    it("rejects OAuth " + Object.keys(claims)[0] + " mismatch before tool dispatch", async () => {
+      const settings = config([KYNTRAL_SCOPES.execute], true, 300, claims);
+      const args = allowWorkflow(settings);
+      const put = vi.spyOn(settings.store as SqliteKyntralStore, "putAuthorizedJob");
+      const { response } = await rpc(createKyntralHttpHandler(settings), "tools/call", {
+        name: "kyntral_queue_workflow", arguments: args
+      });
+      expect(response.status).toBe(401);
+      expect(put).not.toHaveBeenCalled();
+    });
+  }
   it("rejects malformed tool input rather than coercing it", async () => {
     const handler = createKyntralHttpHandler(config([KYNTRAL_SCOPES.read]));
     const { response, body } = await rpc(handler, "tools/call", {

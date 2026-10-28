@@ -100,6 +100,60 @@ final class KCJCanonicalizerTests: XCTestCase {
         )
     }
 
+    func testChangedActionScopeInvalidatesFrozenSignature() throws {
+        let encoded = try JSONEncoder().encode(vectorAction)
+        var object = try XCTUnwrap(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+        object["scopeId"] = "scope_tampered_001"
+        let changed = try JSONDecoder().decode(
+            LocalActionEnvelope.self,
+            from: JSONSerialization.data(withJSONObject: object)
+        )
+        XCTAssertFalse(try ActionVerifier.verifyAuthorizationSignature(
+            action: changed, trustedKey: authorizationKey
+        ))
+    }
+
+    func testSignedReceiptUsesProtocolWireShapeAndDeviceSignature() async throws {
+        let manager = DeviceKeyManager()
+        let identity = try await manager.identity()
+        let receipt = try await ReceiptSigner(keyManager: manager).sign(
+            action: vectorAction, outcome: "completed", completed: 1, failed: 0,
+            startedAt: Date(timeIntervalSince1970: 1_800_000_000),
+            completedAt: Date(timeIntervalSince1970: 1_800_000_001)
+        )
+        var object = try XCTUnwrap(JSONSerialization.jsonObject(
+            with: JSONEncoder().encode(receipt)
+        ) as? [String: Any])
+        XCTAssertEqual(object["counts"] as? [String: Int], ["completed": 1, "failed": 0])
+        XCTAssertEqual(receipt.deviceProof.keyId, identity.signingPublicKey.kid)
+        XCTAssertEqual(receipt.deviceProof.algorithm, "ES256")
+        XCTAssertEqual(receipt.actionHash, try vectorAction.actionHash())
+        XCTAssertNil(object["signature"])
+        object.removeValue(forKey: "deviceProof")
+
+        func canonical(_ value: Any) throws -> KCJValue {
+            switch value {
+            case let value as String: return .string(value)
+            case let value as Int: return .integer(Int64(value))
+            case let value as [String: Any]: return .object(try value.mapValues(canonical))
+            default: throw CocoaError(.coderInvalidValue)
+            }
+        }
+        func decode(_ value: String) throws -> Data {
+            let raw = value.replacingOccurrences(of: "-", with: "+")
+                .replacingOccurrences(of: "_", with: "/")
+            return try XCTUnwrap(Data(base64Encoded: raw + String(repeating: "=", count: (4 - raw.count % 4) % 4)))
+        }
+        var rawKey = Data([0x04])
+        rawKey.append(try decode(identity.signingPublicKey.x))
+        rawKey.append(try decode(identity.signingPublicKey.y))
+        let key = try P256.Signing.PublicKey(x963Representation: rawKey)
+        let signature = try P256.Signing.ECDSASignature(derRepresentation: decode(receipt.deviceProof.signature))
+        XCTAssertTrue(key.isValidSignature(signature, for: try KCJCanonicalizer.signingPreimage(
+            purpose: "execution-receipt", payload: canonical(object)
+        )))
+    }
+
     func testReplayLedgerConsumesActionNonceAndIdempotencyOnce() async throws {
         let stateURL = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString + ".json")
