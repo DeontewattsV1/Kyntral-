@@ -76,7 +76,7 @@ describe("MCP SDK 2.4.0 HTTP transport and authorization", () => {
     it("initializes " + version + " through the real HTTP handler", async () => {
       const handler = createKyntralHttpHandler(config([KYNTRAL_SCOPES.read]));
       const { response, body } = await rpc(handler, "initialize", init(version), version);
-      expect(response.status).toBe(200);
+      expect(response.status, `protocol=${version} response=${JSON.stringify(body)}`).toBe(200);
       expect(body.error).toBeUndefined();
       expect(body.result?.protocolVersion).toBe(version);
       expect(body.result?.serverInfo).toMatchObject({ name: "kyntral" });
