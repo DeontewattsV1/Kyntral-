@@ -60,7 +60,7 @@ async function rpc(
       "content-type": "application/json",
       accept: "application/json, text/event-stream",
       "mcp-protocol-version": protocolVersion,
-      ...(protocolVersion === "2026-07-28" ? { "mcp-method": method } : {})
+      ...(protocolVersion === "2026-07-28" && method !== "initialize" ? { "mcp-method": method } : {})
     },
     body: JSON.stringify({ jsonrpc: "2.0", id: 7, method, params: protocolVersion === "2026-07-28" ? { ...params, _meta: { "io.modelcontextprotocol/protocolVersion": protocolVersion, "io.modelcontextprotocol/clientCapabilities": {} } } : params })
   }));
