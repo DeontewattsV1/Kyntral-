@@ -72,16 +72,31 @@ function init(version: string): Record<string, unknown> {
   };
 }
 describe("MCP SDK 2.4.0 HTTP transport and authorization", () => {
-  for (const version of ["2025-11-25", "2026-07-28"]) {
-    it("initializes " + version + " through the real HTTP handler", async () => {
-      const handler = createKyntralHttpHandler(config([KYNTRAL_SCOPES.read]));
-      const { response, body } = await rpc(handler, "initialize", init(version), version);
-      expect(response.status, `protocol=${version} response=${JSON.stringify(body)}`).toBe(200);
-      expect(body.error).toBeUndefined();
-      expect(body.result?.protocolVersion).toBe(version);
-      expect(body.result?.serverInfo).toMatchObject({ name: "kyntral" });
-    });
-  }
+  it("initializes legacy protocol 2025-11-25", async () => {
+    const handler = createKyntralHttpHandler(config([KYNTRAL_SCOPES.read]));
+    const { response, body } = await rpc(handler, "initialize", init("2025-11-25"));
+    expect(response.status).toBe(200);
+    expect(body.error).toBeUndefined();
+    expect(body.result?.protocolVersion).toBe("2025-11-25");
+    expect(body.result?.serverInfo).toMatchObject({ name: "kyntral" });
+  });
+  it("rejects a legacy handshake with a modern protocol header", async () => {
+    const handler = createKyntralHttpHandler(config([KYNTRAL_SCOPES.read]));
+    const { response, body } = await rpc(
+      handler, "initialize", init("2026-07-28"), "2026-07-28"
+    );
+    expect(response.status).toBe(400);
+    expect(body.error?.code).toBe(-32020);
+    expect(body.error?.message).toContain("headers and body disagree");
+  });
+  it("accepts modern 2026-07-28 tools/list without a legacy handshake", async () => {
+    const handler = createKyntralHttpHandler(config([KYNTRAL_SCOPES.read]));
+    const { response, body } = await rpc(handler, "tools/list", {}, "2026-07-28");
+    expect(response.status, JSON.stringify(body)).toBe(200);
+    expect(body.error).toBeUndefined();
+    const tools = body.result?.tools as Array<{ name: string }>;
+    expect(tools.map(t => t.name)).toContain("kyntral_get_profile");
+  });
   it("advertises typed tools but no generic execution", async () => {
     const handler = createKyntralHttpHandler(config([KYNTRAL_SCOPES.read]));
     const { response, body } = await rpc(handler, "tools/list", {});
