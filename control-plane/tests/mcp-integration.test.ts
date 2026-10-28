@@ -61,7 +61,7 @@ async function rpc(
       accept: "application/json, text/event-stream",
       "mcp-protocol-version": protocolVersion
     },
-    body: JSON.stringify({ jsonrpc: "2.0", id: 7, method, params })
+    body: JSON.stringify({ jsonrpc: "2.0", id: 7, method, params: protocolVersion === "2026-07-28" ? { ...params, _meta: {} } : params })
   }));
   return { response, body: parseRpc(await response.text()) };
 }
