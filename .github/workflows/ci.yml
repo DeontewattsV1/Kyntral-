@@ -13,12 +13,25 @@ concurrency:
 permissions:
   contents: read
 
+defaults:
+  run:
+    shell: bash
+
 jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Record tested revision
+        run: |
+          mkdir -p artifacts/ci
+          git rev-parse HEAD | tee artifacts/ci/source-commit.txt
+          python3 scripts/verify-ios-evidence.py --manifest artifacts/ci/ios-source-tests.json
+          python3 scripts/test_verify_ios_evidence.py
 
       - name: Setup Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -27,24 +40,38 @@ jobs:
           package-manager-cache: false
 
       - name: Install
-        run: npm install
+        run: |
+          npm install
+          cp package-lock.json artifacts/ci/package-lock.json
 
       - name: Dependency audit
         run: npm run security:audit
 
       - name: Generate CycloneDX SBOM
         run: |
-          npm sbom --sbom-format=cyclonedx > sbom.cdx.json
-          test -s sbom.cdx.json
+          npm sbom --sbom-format=cyclonedx > artifacts/ci/sbom.cdx.json
+          test -s artifacts/ci/sbom.cdx.json
 
       - name: Typecheck
         run: npm run typecheck
 
       - name: Unit tests
-        run: npm test
+        run: npm test -- --reporter=default --reporter=junit --outputFile=artifacts/ci/unit-tests.xml
+
+      - name: Focused MCP transport and authorization
+        run: npm run test:mcp -- --reporter=verbose --reporter=junit --outputFile=artifacts/ci/mcp-tests.xml 2>&1 | tee artifacts/ci/mcp-tests.log
 
       - name: Conformance
-        run: npm run conformance
+        run: npm run conformance -- --reporter=default --reporter=junit --outputFile=artifacts/ci/conformance-tests.xml
+
+      - name: Retain CI evidence and SBOM
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ci-evidence-${{ github.event.pull_request.head.sha || github.sha }}
+          path: artifacts/ci/
+          if-no-files-found: error
+          retention-days: 30
 
   secrets:
     runs-on: ubuntu-latest

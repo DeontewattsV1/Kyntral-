@@ -3,51 +3,66 @@ name: iOS
 on:
   push:
     branches: [main]
-    paths:
-      - "ios/**"
-      - "control-plane/src/time.ts"
-      - "protocol/**"
-      - "conformance/**"
-      - ".github/workflows/ios.yml"
   pull_request:
     branches: [main]
-    paths:
-      - "ios/**"
-      - "control-plane/src/time.ts"
-      - "protocol/**"
-      - "conformance/**"
-      - ".github/workflows/ios.yml"
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
 
+defaults:
+  run:
+    shell: bash
+
 jobs:
   ios-build-test:
     runs-on: macos-latest
+    timeout-minutes: 30
     steps:
-      - name: Checkout
+      - name: Checkout tested revision
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
-      - name: Select latest installed Xcode
+      - name: Record toolchain and verify target membership
         run: |
-          XCODE_PATH=$(ls -d /Applications/Xcode*.app | sort -V | tail -1)
-          sudo xcode-select -s "$XCODE_PATH/Contents/Developer"
-          xcodebuild -version
+          mkdir -p artifacts/ios
+          git rev-parse HEAD | tee artifacts/ios/source-commit.txt
+          xcodebuild -version | tee artifacts/ios/xcode-version.txt
+          xcrun simctl list devices available -j > artifacts/ios/simulators.json
+          python3 scripts/verify-ios-evidence.py --manifest artifacts/ios/source-tests.json
 
-      - name: Build and test Kyntral iOS
+      - name: Execute all Kyntral XTests
         run: |
-          set -euo pipefail
-          SIMULATOR_ID="$(xcrun simctl list devices available -j | jq -r '[.devices[][] | select(.isAvailable == true and (.name | startswith("iPhone"))) | .udid][0] // empty')"
-          if [[ -z "$SIMULATOR_ID" ]]; then
-            echo "No available iPhone simulator for the selected Xcode toolchain" >&2
-            xcrun simctl list devices available
-            exit 1
-          fi
-          echo "Testing on iPhone simulator: $SIMULATOR_ID"
+          SIMULATOR_ID="$(jq -r '[.devices[][] | select(.isAvailable == true and (.name | startswith("iPhone"))) | .udid][0] // empty' artifacts/ios/simulators.json)"
+          test -n "$SIMULATOR_ID"
+          echo "$SIMULATOR_ID" > artifacts/ios/simulator-id.txt
           xcodebuild \
             -project ios/Kyntral.xcodeproj \
             -scheme Kyntral \
             -destination "platform=iOS Simulator,id=$SIMULATOR_ID" \
+            -parallel-testing-enabled NO \
+            -resultBundlePath artifacts/ios/Kyntral.xcresult \
             CODE_SIGNING_ALLOWED=YES \
             CODE_SIGN_IDENTITY=- \
-            test
+            test 2>&1 | tee artifacts/ios/xcodebuild-test.log
+
+      - name: Verify every expected XCTest executed and passed
+        if: always()
+        run: |
+          xcrun xcresulttool get test-results tests \
+            --path artifacts/ios/Kyntral.xcresult \
+            --compact > artifacts/ios/test-results.json
+          python3 scripts/verify-ios-evidence.py --xcresult-json artifacts/ios/test-results.json
+
+      - name: Retain Xcode result bundle and execution evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ios-evidence-${{ github.event.pull_request.head.sha || github.sha }}
+          path: artifacts/ios/
+          if-no-files-found: error
+          retention-days: 30

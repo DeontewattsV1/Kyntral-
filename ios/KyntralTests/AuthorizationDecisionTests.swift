@@ -127,6 +127,31 @@ final class AuthorizationDecisionTests: XCTestCase {
         XCTAssertEqual(conflicting, .conflict)
     }
 
+    func testStandingGrantRejectsFutureIssuanceAndRiskMismatch() async throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString + ".json")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let registry = LocalWorkflowRegistry(stateURL: url)
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        for issuedAt in [now.addingTimeInterval(60), now.addingTimeInterval(-60)] {
+            try await registry.putStandingGrant(LocalStandingGrant(
+                scopeId: "scope_test_001", workflowId: "wf_test_001",
+                capability: "workflow.execute", risk: .k2, allowed: true,
+                issuedAt: issuedAt, expiresAt: now.addingTimeInterval(120)
+            ))
+            let decision = await registry.decision(
+                workflowId: "wf_test_001", capability: "workflow.execute",
+                risk: .k2, scopeId: "scope_test_001", now: now
+            )
+            XCTAssertEqual(decision, issuedAt > now ? .unknown : .allowed)
+            let wrongRisk = await registry.decision(
+                workflowId: "wf_test_001", capability: "workflow.execute",
+                risk: .k3, scopeId: "scope_test_001", now: now
+            )
+            XCTAssertEqual(wrongRisk, .denied)
+        }
+    }
+
     func testPairingClientRejectsNonHTTPSService() {
         XCTAssertThrowsError(
             try KyntralPairingClient(

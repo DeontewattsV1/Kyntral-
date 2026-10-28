@@ -8,6 +8,7 @@
     "typecheck": "tsc -p control-plane/tsconfig.json --noEmit && tsc -p tsconfig.conformance.json --noEmit",
     "build": "tsc -p control-plane/tsconfig.json",
     "test": "vitest run control-plane/tests",
+    "test:mcp": "vitest run control-plane/tests/mcp-integration.test.ts",
     "conformance": "vitest run conformance",
     "security:audit": "npm audit --audit-level=high",
     "sbom": "npm sbom --sbom-format=cyclonedx"
