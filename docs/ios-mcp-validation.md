@@ -4,6 +4,9 @@ The Xcode target uses one implementation per type. `DeviceAuthority.swift`,
 `LocalWorkflowRuntime.swift`, and `MediaIntake.swift` were overlapping consolidated
 copies and are removed. The target now compiles the split core files, the device
 client and local inbox, all four App Intents files, and all six XCTest files.
+`DeviceKeyManager.swift` retains the previously compiled CryptoKit/Keychain
+implementation, including its service, account names, and accessibility policy,
+so reconciliation preserves existing device keys rather than changing custody.
 
 The protocol action/receipt types, action signature verifier, and replay ledger in
 `ReceiptSigner.swift` are restored from repository commit

@@ -30,6 +30,8 @@ final class KyntralCoreTests: XCTestCase {
             identity.signingPublicKey.x,
             identity.keyAgreementPublicKey.x
         )
+        let reloaded = try await DeviceKeyManager().identity()
+        XCTAssertEqual(reloaded, identity)
     }
 
     func testURLFragmentsDoNotCreateDifferentDedupeIdentity() {

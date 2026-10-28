@@ -25,35 +25,81 @@ public struct KyntralDeviceIdentity: Codable, Sendable, Equatable {
 
 public enum KyntralKeyError: Error {
     case keychain(OSStatus)
-    case keyCreation
-    case publicKey
-    case signature
+    case invalidPublicKey
+}
+
+private enum KyntralKeychain {
+    static let service = "com.deontewatts.kyntral.device-keys"
+
+    static func read(account: String) throws -> Data? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+        var result: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        if status == errSecItemNotFound { return nil }
+        guard status == errSecSuccess else {
+            throw KyntralKeyError.keychain(status)
+        }
+        return result as? Data
+    }
+
+    static func write(_ data: Data, account: String) throws {
+        let base: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account
+        ]
+        let status = SecItemCopyMatching(base as CFDictionary, nil)
+        if status == errSecSuccess {
+            let update: [String: Any] = [kSecValueData as String: data]
+            let updateStatus = SecItemUpdate(
+                base as CFDictionary,
+                update as CFDictionary
+            )
+            guard updateStatus == errSecSuccess else {
+                throw KyntralKeyError.keychain(updateStatus)
+            }
+            return
+        }
+
+        var insert = base
+        insert[kSecValueData as String] = data
+        insert[kSecAttrAccessible as String] =
+            kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+        let addStatus = SecItemAdd(insert as CFDictionary, nil)
+        guard addStatus == errSecSuccess else {
+            throw KyntralKeyError.keychain(addStatus)
+        }
+    }
 }
 
 public actor DeviceKeyManager {
     public static let shared = DeviceKeyManager()
 
-    private let signingTag = Data("com.deontewatts.kyntral.signing".utf8)
-    private let agreementTag = Data("com.deontewatts.kyntral.key-agreement".utf8)
     private let defaults = UserDefaults.standard
 
     public init() {}
 
     public func identity() throws -> KyntralDeviceIdentity {
-        let signing = try loadOrCreate(tag: signingTag)
-        let agreement = try loadOrCreate(tag: agreementTag)
+        let signing = try signingKey()
+        let agreement = try agreementKey()
         return KyntralDeviceIdentity(
             version: "kyntral.device.v1",
             deviceId: deviceId(),
             platform: "ios",
             signingPublicKey: try jwk(
-                key: signing,
+                representation: signing.publicKey.x963Representation,
                 prefix: "devsig",
                 use: "sig",
                 alg: "ES256"
             ),
             keyAgreementPublicKey: try jwk(
-                key: agreement,
+                representation: agreement.publicKey.x963Representation,
                 prefix: "devkex",
                 use: "enc",
                 alg: "ECDH-ES"
@@ -63,104 +109,37 @@ public actor DeviceKeyManager {
     }
 
     public func sign(_ data: Data) throws -> Data {
-        let key = try loadOrCreate(tag: signingTag)
-        var error: Unmanaged<CFError>?
-        guard let signature = SecKeyCreateSignature(
-            key,
-            .ecdsaSignatureMessageX962SHA256,
-            data as CFData,
-            &error
-        ) as Data? else {
-            if let error = error?.takeRetainedValue() {
-                throw error
-            }
-            throw KyntralKeyError.signature
-        }
-        return signature
+        try signingKey().signature(for: data).derRepresentation
     }
 
     public func signingKeyID() throws -> String {
         try jwk(
-            key: loadOrCreate(tag: signingTag),
+            representation: signingKey().publicKey.x963Representation,
             prefix: "devsig",
             use: "sig",
             alg: "ES256"
         ).kid
     }
 
-    private func loadOrCreate(tag: Data) throws -> SecKey {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassKey,
-            kSecAttrApplicationTag as String: tag,
-            kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom,
-            kSecReturnRef as String: true
-        ]
-        var existing: CFTypeRef?
-        let status = SecItemCopyMatching(query as CFDictionary, &existing)
-        if status == errSecSuccess, let key = existing as! SecKey? {
-            return key
+    private func signingKey() throws -> P256.Signing.PrivateKey {
+        if let raw = try KyntralKeychain.read(account: "signing") {
+            return try P256.Signing.PrivateKey(rawRepresentation: raw)
         }
-        if status != errSecItemNotFound {
-            throw KyntralKeyError.keychain(status)
-        }
-
-        if let secure = try? createKey(tag: tag, secureEnclave: true) {
-            return secure
-        }
-        return try createKey(tag: tag, secureEnclave: false)
-    }
-
-    private func createKey(tag: Data, secureEnclave: Bool) throws -> SecKey {
-        var attributes: [String: Any] = [
-            kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom,
-            kSecAttrKeySizeInBits as String: 256,
-            kSecPrivateKeyAttrs as String: [
-                kSecAttrIsPermanent as String: true,
-                kSecAttrApplicationTag as String: tag,
-                kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly
-            ]
-        ]
-        if secureEnclave {
-            attributes[kSecAttrTokenID as String] = kSecAttrTokenIDSecureEnclave
-        }
-        var error: Unmanaged<CFError>?
-        guard let key = SecKeyCreateRandomKey(attributes as CFDictionary, &error) else {
-            if let error = error?.takeRetainedValue() {
-                throw error
-            }
-            throw KyntralKeyError.keyCreation
-        }
+        let key = P256.Signing.PrivateKey()
+        try KyntralKeychain.write(key.rawRepresentation, account: "signing")
         return key
     }
 
-    private func jwk(
-        key: SecKey,
-        prefix: String,
-        use: String,
-        alg: String
-    ) throws -> KyntralPublicJWK {
-        guard let publicKey = SecKeyCopyPublicKey(key) else {
-            throw KyntralKeyError.publicKey
+    private func agreementKey() throws -> P256.KeyAgreement.PrivateKey {
+        if let raw = try KyntralKeychain.read(account: "key-agreement") {
+            return try P256.KeyAgreement.PrivateKey(rawRepresentation: raw)
         }
-        var error: Unmanaged<CFError>?
-        guard let raw = SecKeyCopyExternalRepresentation(publicKey, &error) as Data?,
-              raw.count == 65,
-              raw.first == 0x04 else {
-            throw KyntralKeyError.publicKey
-        }
-        let x = raw.subdata(in: 1..<33)
-        let y = raw.subdata(in: 33..<65)
-        let digest = SHA256.hash(data: raw)
-        let kid = prefix + "_" + Data(digest.prefix(12)).base64URLString
-        return KyntralPublicJWK(
-            kty: "EC",
-            crv: "P-256",
-            x: x.base64URLString,
-            y: y.base64URLString,
-            kid: kid,
-            use: use,
-            alg: alg
+        let key = P256.KeyAgreement.PrivateKey()
+        try KyntralKeychain.write(
+            key.rawRepresentation,
+            account: "key-agreement"
         )
+        return key
     }
 
     private func deviceId() -> String {
@@ -183,6 +162,30 @@ public actor DeviceKeyManager {
         let value = formatter.string(from: Date())
         defaults.set(value, forKey: "kyntral.device.createdAt")
         return value
+    }
+
+    private func jwk(
+        representation: Data,
+        prefix: String,
+        use: String,
+        alg: String
+    ) throws -> KyntralPublicJWK {
+        guard representation.count == 65, representation.first == 0x04 else {
+            throw KyntralKeyError.invalidPublicKey
+        }
+        let x = representation.subdata(in: 1..<33)
+        let y = representation.subdata(in: 33..<65)
+        let digest = SHA256.hash(data: representation)
+        let keyId = prefix + "_" + Data(digest.prefix(12)).base64URLString
+        return KyntralPublicJWK(
+            kty: "EC",
+            crv: "P-256",
+            x: x.base64URLString,
+            y: y.base64URLString,
+            kid: keyId,
+            use: use,
+            alg: alg
+        )
     }
 }
 
