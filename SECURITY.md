@@ -4,7 +4,7 @@ Kyntral treats authorization boundaries as part of the product, not as prompt gu
 
 ## Report vulnerabilities
 
-Report security issues to [deonte@goodshyt.fun](mailto:deonte@goodshyt.fun). When the report contains exploitable details, open a GitHub Security Advisory for this repository rather than a public issue.
+Until a dedicated security mailbox is published, open a GitHub Security Advisory for this repository rather than a public issue when the report contains exploitable details.
 
 Do not include real user content, credentials, access tokens, private keys, device secrets, or private workflow payloads in reports.
 

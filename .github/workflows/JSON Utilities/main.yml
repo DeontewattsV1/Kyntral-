@@ -1,0 +1,23 @@
+- name: JSON Utils
+  # You may pin to the exact commit or the version.
+  # uses: yakubique/json-utils@d7cadc682382d02917ba256b546014bf48b1715f
+  uses: yakubique/json-utils@v1.8
+  with:
+    # JSON string/Value from other action
+    input: 
+    # Secondary JSON string/Value from other action (useful for some actions)
+    secondary: # optional
+    # What to do with input JSON (available: "diff", "get", "pick", "sort", "concat", "chunk", "none")
+    action: 
+    # Type of input data `["flat-json", "nested-json"]` (default: "flat-json")
+    type: # optional, default is flat-json
+    # If `type="nested-json"` - which key should be used
+    key: # optional
+    # Suitable modifier for performed action (ex: 'ASC'/'DESC' for 'sort')
+    modifier: # optional
+    # Load input from file (applied to secondary too)
+    from_file: # optional, default is false
+    # Output to file
+    to_file: # optional, default is false
+    # `space` parameter to JSON.stringify as a number
+    space: # optional

@@ -26,7 +26,7 @@ The canonical project retains final authority over:
 - security release decisions
 - commercial licensing of BUSL-covered components
 
-Current canonical steward: **Deonté O'dell Watts / GoodShyt Group Inc.** (@DeontewattsV1).
+Current canonical steward: **Deonte Watts (@DeontewattsV1)**.
 
 ## KEP requirement
 

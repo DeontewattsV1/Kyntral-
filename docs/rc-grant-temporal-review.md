@@ -1,7 +1,7 @@
 # RC grant temporal integrity review
 
 Base: `20a6a6047f19e793e03e254304cec1c59d4ac47a`.
-Review date: 2026-10-08 UTC.
+Review date: 2026-10-08 UTC. Implementation and regression tests: AI-assisted.
 
 ## Verified narrow boundary
 
