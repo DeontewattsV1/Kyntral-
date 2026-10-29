@@ -1,5 +1,7 @@
 # Kyntral mixed-license notice
 
+Copyright (c) 2026 Deonté O'dell Watts / GoodShyt Group Inc.
+
 This repository is **not distributed under one uniform license**.
 
 ## Apache-2.0 components
@@ -23,7 +25,7 @@ The following are licensed under Business Source License 1.1 unless a file says 
 
 Kyntral BUSL parameters for this initial public version:
 
-- **Licensor:** Deonte Watts
+- **Licensor:** Deonté O'dell Watts / GoodShyt Group Inc.
 - **Licensed Work:** Kyntral Core, version 0.1.x
 - **Additional Use Grant:** Personal, non-commercial production use on devices you own or control is permitted. Offering the Licensed Work, or a substantially similar derivative of the Licensed Work, to third parties as a hosted commercial service requires a separate commercial license.
 - **Change Date:** October 6, 2030, or the fourth anniversary of the first public distribution of the applicable version, whichever occurs first.

@@ -3,7 +3,7 @@
 - Status: Accepted for v0.1 release-candidate implementation
 - Protocol impact: yes
 - Security review: required before production release
-- Author: Deonte Watts
+- Author: Deonté O'dell Watts / GoodShyt Group Inc.
 - Date: 2026-10-06
 
 ## Decision

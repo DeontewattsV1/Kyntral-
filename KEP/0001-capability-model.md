@@ -1,7 +1,7 @@
 # KEP-0001 — Capability and risk model
 
 Status: Draft  
-Author: Deonte Watts  
+Author: Deonté O'dell Watts / GoodShyt Group Inc.  
 Date: 2026-10-06
 
 ## Decision
