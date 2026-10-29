@@ -45,7 +45,7 @@ Changes to authentication, authorization, cryptography, device pairing, receipt 
 
 - Install with `npm install`. This repository has no lockfile, so `npm ci` does not apply.
 - Node.js 22 or newer is required. The control plane uses built-in `node:sqlite`; the experimental SQLite warning during tests is expected.
-- `npm test`, `npm run conformance`, and `npm run security:audit` are the working checks. `npm run typecheck` currently fails on TypeScript 7.0.2 with TS6059 because `control-plane/tsconfig.json` includes `../conformance/**/*.ts` outside the inferred `rootDir`.
+- Required checks are `npm run typecheck`, `npm test`, and `npm run conformance`. `npm run security:audit` is the CI dependency audit. `npm run typecheck` typechecks `control-plane/tsconfig.json` and `tsconfig.conformance.json`. Conformance stays in the second project, with `rootDir` set to the repository root, so those tests are checked without changing the control-plane emit layout.
 - The control plane is an in-process HTTP handler. It does not listen on a development port. Exercise it through the Vitest suites.
 - `builder/index.html` is the static Capability Manifest prototype. The Cloud Agent start command serves that directory at `http://127.0.0.1:4173/`.
 - `ios/` builds with Xcode on macOS (`xcodebuild` in `.github/workflows/ios.yml`). It is outside the Linux Cloud Agent loop.
