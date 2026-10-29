@@ -48,6 +48,4 @@ MCP/OAuth service, OpenAI/xAI interoperability, active repository protection,
 legal review, or independent security approval. Those release gates remain open
 until separately supported by evidence. See `release-gates.md`.
 
-Provenance: repository source reconciliation and AI-assisted implementation for
-Deonté O'dell Watts, GoodShyt Group Inc., 2026-10-28. Existing license assignments
-remain applicable. No scientific novelty claim.
+Provenance: repository source reconciliation for Deonté O'dell Watts / GoodShyt Group Inc., 2026-10-28. Existing license assignments remain applicable. No scientific novelty claim.
