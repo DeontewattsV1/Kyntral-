@@ -4,6 +4,27 @@ import Foundation
 import XCTest
 @testable import Kyntral
 
+// URLSession may expose a POST body as a stream inside a custom URLProtocol.
+// Keep the pairing-proof assertions identical for both representations.
+private func pairingRequestBody(_ request: URLRequest) throws -> Data {
+    if let body = request.httpBody { return body }
+    let stream = try XCTUnwrap(request.httpBodyStream)
+    stream.open()
+    defer { stream.close() }
+
+    var body = Data()
+    var buffer = [UInt8](repeating: 0, count: 4096)
+    while true {
+        let bytesRead = stream.read(&buffer, maxLength: buffer.count)
+        if bytesRead < 0 {
+            throw stream.streamError ?? URLError(.cannotDecodeRawData)
+        }
+        if bytesRead == 0 { break }
+        body.append(contentsOf: buffer.prefix(bytesRead))
+    }
+    return body
+}
+
 private final class PairingMockURLProtocol: URLProtocol {
     static var handler: ((URLRequest) throws -> (HTTPURLResponse, Data))?
 
@@ -236,7 +257,7 @@ final class AuthorizationDecisionTests: XCTestCase {
 
             if request.url?.path == "/v1/pairing/complete" {
                 XCTAssertEqual(request.httpMethod, "POST")
-                let bodyData = try XCTUnwrap(request.httpBody)
+                let bodyData = try pairingRequestBody(request)
                 let body = try XCTUnwrap(
                     JSONSerialization.jsonObject(with: bodyData) as? [String: Any]
                 )
