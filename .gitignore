@@ -12,4 +12,3 @@ DerivedData/
 .build/
 artifacts/
 __pycache__/
-*.pyc

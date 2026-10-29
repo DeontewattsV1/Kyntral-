@@ -163,4 +163,4 @@ Kyntral is an independent project. It is not affiliated with, sponsored by, or e
 
 ---
 
-Initial architecture and repository stewardship: **Deonté O'dell Watts / GoodShyt Group Inc.** (GitHub: [DeontewattsV1](https://github.com/DeontewattsV1), ORCID [0009-0005-8586-3650](https://orcid.org/0009-0005-8586-3650)).
+Initial architecture and repository stewardship: **Deonte Watts**.

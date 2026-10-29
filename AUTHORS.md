@@ -2,9 +2,7 @@
 
 ## Originator and canonical steward
 
-**Deonté O'dell Watts / GoodShyt Group Inc.**  
-GitHub: [DeontewattsV1](https://github.com/DeontewattsV1)  
-ORCID: [0009-0005-8586-3650](https://orcid.org/0009-0005-8586-3650)  
+**Deonte Watts**  
 Independent Researcher / Developer  
 Initial Kyntral architecture and repository: October 6, 2026
 
