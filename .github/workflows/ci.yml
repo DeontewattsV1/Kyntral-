@@ -41,7 +41,7 @@ jobs:
 
       - name: Install
         run: |
-          npm install
+          npm ci
           cp package-lock.json artifacts/ci/package-lock.json
 
       - name: Dependency audit
