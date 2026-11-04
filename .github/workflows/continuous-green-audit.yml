@@ -1,0 +1,63 @@
+name: Continuous Green Audit
+
+on:
+  schedule:
+    - cron: "17 9 * * *"
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: continuous-green-audit
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Inspect latest default-branch workflow results
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          AUDIT_WORKFLOW: ${{ github.workflow }}
+        run: |
+          set -euo pipefail
+          gh api "repos/${GH_REPO}/actions/runs?branch=${DEFAULT_BRANCH}&per_page=100" > runs.json
+          jq -e '.workflow_runs | type == "array"' runs.json >/dev/null
+          jq -r --arg self "$AUDIT_WORKFLOW" '
+            [.workflow_runs[]
+              | select(.name != $self)
+              | select(.event == "push" or .event == "schedule" or .event == "workflow_dispatch")
+              | {name, id, status, conclusion, html_url, created_at}
+            ]
+            | group_by(.name)
+            | map(sort_by(.created_at) | last)
+            | sort_by(.name)
+            | .[]
+            | [.name, .status, (.conclusion // "pending"), .html_url]
+            | @tsv
+          ' runs.json > latest.tsv
+          {
+            echo "## Continuous Green Audit"
+            echo "Scope: latest observed default-branch run per workflow (up to 100 recent runs)."
+            echo "This is a bounded health signal, not a complete repository or PR audit."
+            echo ""
+            echo "| Workflow | Status | Conclusion | Run |"
+            echo "| --- | --- | --- | --- |"
+            while IFS=$'\t' read -r name status conclusion url; do
+              printf '| %s | %s | %s | [Details](%s) |\n' "$name" "$status" "$conclusion" "$url"
+            done < latest.tsv
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ ! -s latest.tsv ]; then
+            echo "::error::No other workflow runs observed; health cannot be established"
+            exit 1
+          fi
+          if awk -F '\t' '$2 != "completed" || ($3 != "success" && $3 != "neutral" && $3 != "skipped") {bad=1; print "BLOCKER: " $0} END {exit !bad}' latest.tsv; then
+            echo "::error::One or more latest workflow runs are failed, cancelled, incomplete, or require investigation"
+            exit 1
+          fi
+          echo "Latest observed default-branch workflow runs have no blocking conclusions."
