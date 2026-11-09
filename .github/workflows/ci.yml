@@ -41,6 +41,7 @@ jobs:
 
       - name: Install
         run: |
+          npm install --global npm@11.19.1
           npm install
           cp package-lock.json artifacts/ci/package-lock.json
 
