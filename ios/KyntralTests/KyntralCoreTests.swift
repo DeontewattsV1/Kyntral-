@@ -81,4 +81,39 @@ final class KyntralCoreTests: XCTestCase {
         )
     }
 
+
+    func testResolverRejectsUnauthorizedMediaHostBeforeNetwork() async throws {
+        let resolver = try CobaltCompatibleResolver(
+            endpoint: URL(string: "https://resolver.example/api")!,
+            allowedEndpointHosts: ["resolver.example"]
+        )
+        let media = ResolvedMedia(
+            url: URL(string: "https://unapproved.invalid/media.mp4")!,
+            filename: "media.mp4"
+        )
+        do {
+            _ = try await resolver.download(media)
+            XCTFail("Unapproved media host must be refused before any request")
+        } catch CobaltResolverError.unapprovedEndpoint {
+            // Expected exact policy denial, not a DNS/network error.
+        } catch {
+            XCTFail("Unexpected resolver error: \(error)")
+        }
+    }
+
+    func testResolverRejectsLocalMediaSourceBeforeNetwork() async throws {
+        let resolver = try CobaltCompatibleResolver(
+            endpoint: URL(string: "https://resolver.example/api")!,
+            allowedEndpointHosts: ["resolver.example"]
+        )
+        do {
+            _ = try await resolver.resolve(source: URL(string: "https://127.0.0.1/private")!)
+            XCTFail("Private source must be denied before contacting resolver")
+        } catch CobaltResolverError.unapprovedSource {
+            // Expected exact policy denial.
+        } catch {
+            XCTFail("Unexpected resolver error: \(error)")
+        }
+    }
+
 }
