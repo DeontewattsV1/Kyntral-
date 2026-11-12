@@ -235,11 +235,72 @@ public enum ActionReplayReservationResult: Sendable, Equatable {
     case conflict
 }
 
+public enum ActionReplayPersistenceError: Error {
+    case untrustedCheckpoint
+    case keychain(OSStatus)
+}
+
+// A Keychain item, not writable JSON, is the authoritative replay snapshot.
+// Its account is scoped to the absolute file path; secrets are not logged.
+private enum ActionReplayCheckpointStore {
+    static let service = "com.deontewatts.kyntral.replay-checkpoint.v1"
+
+    static func account(for url: URL) -> String {
+        let bytes = Data(url.standardizedFileURL.path.utf8)
+        return SHA256.hash(data: bytes)
+            .map { String(format: "%02x", $0) }.joined()
+    }
+
+    static func read(account: String) throws -> Data? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+        var item: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &item)
+        if status == errSecItemNotFound { return nil }
+        guard status == errSecSuccess, let payload = item as? Data else {
+            throw ActionReplayPersistenceError.keychain(status)
+        }
+        return payload
+    }
+
+    static func write(_ payload: Data, account: String, replacing: Bool) throws {
+        let base: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account
+        ]
+        let status: OSStatus
+        if replacing {
+            status = SecItemUpdate(
+                base as CFDictionary,
+                [kSecValueData as String: payload] as CFDictionary
+            )
+        } else {
+            var item = base
+            item[kSecValueData as String] = payload
+            item[kSecAttrAccessible as String] =
+                kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+            status = SecItemAdd(item as CFDictionary, nil)
+        }
+        guard status == errSecSuccess else {
+            throw ActionReplayPersistenceError.keychain(status)
+        }
+    }
+}
+
 public actor ActionReplayLedger {
     public static let shared = ActionReplayLedger()
 
     private let stateURL: URL
+    private let checkpointAccount: String
     private var state: ActionReplayState
+    private var checkpoint: Data?
+    private var integrityFailed = false
 
     public init(stateURL: URL? = nil) {
         let root = FileManager.default.urls(
@@ -248,17 +309,39 @@ public actor ActionReplayLedger {
         ).first!
         let directory = root.appendingPathComponent("Kyntral", isDirectory: true)
         try? FileManager.default.createDirectory(
-            at: directory,
-            withIntermediateDirectories: true
+            at: directory, withIntermediateDirectories: true
         )
-        let resolvedURL = stateURL ??
+        let resolved = stateURL ??
             directory.appendingPathComponent("action-replay-ledger.json")
-        self.stateURL = resolvedURL
-        if let data = try? Data(contentsOf: resolvedURL),
-           let decoded = try? JSONDecoder().decode(ActionReplayState.self, from: data) {
-            self.state = decoded
-        } else {
-            self.state = ActionReplayState()
+        self.stateURL = resolved
+        self.checkpointAccount = ActionReplayCheckpointStore.account(for: resolved)
+        self.state = ActionReplayState()
+        self.checkpoint = nil
+
+        // Existing legacy JSON without an authenticated Keychain checkpoint is
+        // quarantined, not silently migrated to fresh authority. Explicit
+        // manual reconciliation is required before actions may execute.
+        do {
+            let trusted = try ActionReplayCheckpointStore.read(
+                account: checkpointAccount
+            )
+            let fileExists = FileManager.default.fileExists(atPath: resolved.path)
+            if let trusted {
+                guard fileExists,
+                      let mirrored = try? Data(contentsOf: resolved),
+                      mirrored == trusted,
+                      let decoded = try? JSONDecoder().decode(
+                        ActionReplayState.self, from: trusted
+                      ) else {
+                    throw ActionReplayPersistenceError.untrustedCheckpoint
+                }
+                self.state = decoded
+                self.checkpoint = trusted
+            } else if fileExists {
+                throw ActionReplayPersistenceError.untrustedCheckpoint
+            }
+        } catch {
+            self.integrityFailed = true
         }
     }
 
@@ -269,6 +352,7 @@ public actor ActionReplayLedger {
         retainUntil: Date,
         now: Date = Date()
     ) throws -> ActionReplayReservationResult {
+        try verifyCheckpoint()
         prune(before: now)
 
         if let existing = state.reservations?[actionId] {
@@ -292,11 +376,15 @@ public actor ActionReplayLedger {
             state.reservations = [:]
         }
         state.reservations?[actionId] = ActionReplayReservation(
-            nonce: nonce,
-            idempotencyKey: idempotencyKey,
+            nonce: nonce, idempotencyKey: idempotencyKey,
             retainUntil: retainUntil
         )
-        try persist()
+        do {
+            try persist()
+        } catch {
+            integrityFailed = true
+            throw error
+        }
         return .new
     }
 
@@ -308,12 +396,35 @@ public actor ActionReplayLedger {
         now: Date = Date()
     ) throws -> Bool {
         try reserve(
-            actionId: actionId,
-            nonce: nonce,
+            actionId: actionId, nonce: nonce,
             idempotencyKey: idempotencyKey,
-            retainUntil: retainUntil,
-            now: now
+            retainUntil: retainUntil, now: now
         ) == .new
+    }
+
+    private func verifyCheckpoint() throws {
+        guard !integrityFailed else {
+            throw ActionReplayPersistenceError.untrustedCheckpoint
+        }
+        do {
+            let trusted = try ActionReplayCheckpointStore.read(
+                account: checkpointAccount
+            )
+            guard trusted == checkpoint else {
+                throw ActionReplayPersistenceError.untrustedCheckpoint
+            }
+            if let checkpoint {
+                guard let file = try? Data(contentsOf: stateURL),
+                      file == checkpoint else {
+                    throw ActionReplayPersistenceError.untrustedCheckpoint
+                }
+            } else if FileManager.default.fileExists(atPath: stateURL.path) {
+                throw ActionReplayPersistenceError.untrustedCheckpoint
+            }
+        } catch {
+            integrityFailed = true
+            throw error
+        }
     }
 
     private func prune(before now: Date) {
@@ -328,8 +439,14 @@ public actor ActionReplayLedger {
     }
 
     private func persist() throws {
-        let data = try JSONEncoder().encode(state)
-        try data.write(to: stateURL, options: [.atomic])
+        let payload = try JSONEncoder().encode(state)
+        // Secure checkpoint first; a crash before writing the JSON mirror
+        // produces a mismatch and must require recovery, never fresh state.
+        try ActionReplayCheckpointStore.write(
+            payload, account: checkpointAccount, replacing: checkpoint != nil
+        )
+        try payload.write(to: stateURL, options: [.atomic])
+        checkpoint = payload
     }
 }
 

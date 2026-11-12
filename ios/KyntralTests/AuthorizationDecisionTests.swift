@@ -339,4 +339,84 @@ final class AuthorizationDecisionTests: XCTestCase {
         XCTAssertEqual(pinned, completion.authorizationSigningKey)
         try await trustStore.resetForExplicitRepair()
     }
+
+    // Regression probes for old valid JSON and missing-state attacks. An
+    // authenticated replay ledger must not treat either as a fresh install.
+    func testReplayRollbackOfValidPriorSnapshotFailsClosed() async throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString + "-replay.json")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let ledger = ActionReplayLedger(stateURL: url)
+        let first = try await ledger.reserve(
+            actionId: "act_first_001", nonce: "nonce_first_001",
+            idempotencyKey: "idem_first_001",
+            retainUntil: now.addingTimeInterval(400), now: now
+        )
+        XCTAssertEqual(first, .new)
+        let prior = try Data(contentsOf: url)
+        let second = try await ledger.reserve(
+            actionId: "act_second_001", nonce: "nonce_second_001",
+            idempotencyKey: "idem_second_001",
+            retainUntil: now.addingTimeInterval(400), now: now
+        )
+        XCTAssertEqual(second, .new)
+        try prior.write(to: url, options: [.atomic])
+        let reloaded = ActionReplayLedger(stateURL: url)
+        do {
+            _ = try await reloaded.reserve(
+                actionId: "act_second_001", nonce: "nonce_second_001",
+                idempotencyKey: "idem_second_001",
+                retainUntil: now.addingTimeInterval(400), now: now
+            )
+            XCTFail("A restored, valid older replay state must fail closed")
+        } catch {
+            // Expected: the trusted state checkpoint no longer matches.
+        }
+    }
+
+    func testReplayLedgerDeletionAfterReservationFailsClosed() async throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString + "-replay.json")
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let ledger = ActionReplayLedger(stateURL: url)
+        _ = try await ledger.reserve(
+            actionId: "act_delete_001", nonce: "nonce_delete_001",
+            idempotencyKey: "idem_delete_001",
+            retainUntil: now.addingTimeInterval(400), now: now
+        )
+        try FileManager.default.removeItem(at: url)
+        let reloaded = ActionReplayLedger(stateURL: url)
+        do {
+            _ = try await reloaded.reserve(
+                actionId: "act_delete_001", nonce: "nonce_delete_001",
+                idempotencyKey: "idem_delete_001",
+                retainUntil: now.addingTimeInterval(400), now: now
+            )
+            XCTFail("Deleted persisted state must not reset replay authority")
+        } catch {
+            // Expected: prior checkpoint exists but ledger file is gone.
+        }
+    }
+
+    func testReplayLedgerLegitimateRestartPreservesReservation() async throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString + "-replay.json")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let ledger = ActionReplayLedger(stateURL: url)
+        _ = try await ledger.reserve(
+            actionId: "act_restart_001", nonce: "nonce_restart_001",
+            idempotencyKey: "idem_restart_001",
+            retainUntil: now.addingTimeInterval(400), now: now
+        )
+        let reloaded = ActionReplayLedger(stateURL: url)
+        let result = try await reloaded.reserve(
+            actionId: "act_restart_001", nonce: "nonce_restart_001",
+            idempotencyKey: "idem_restart_001",
+            retainUntil: now.addingTimeInterval(400), now: now
+        )
+        XCTAssertEqual(result, .resume)
+    }
+
 }
