@@ -50,4 +50,35 @@ final class KyntralCoreTests: XCTestCase {
         XCTAssertFalse(AuthorizationDecision.expired.permitsExecution)
         XCTAssertFalse(AuthorizationDecision.revoked.permitsExecution)
     }
+
+    // The configured resolver host must not be a local network escape hatch.
+    func testResolverRejectsLoopbackAndPrivateEndpointEvenWhenAllowlisted() {
+        for hostname in ["127.0.0.1", "10.0.0.1", "192.168.1.2", "169.254.169.254", "localhost", "[::1]"] {
+            let endpoint = URL(string: "https://" + hostname + "/api")!
+            let host = endpoint.host!
+            XCTAssertThrowsError(
+                try CobaltCompatibleResolver(
+                    endpoint: endpoint, allowedEndpointHosts: [host]
+                ),
+                "Unsafe resolver host should be denied: \(hostname)"
+            )
+        }
+    }
+
+    func testResolverRejectsCredentialsAndUnapprovedPort() {
+        let hosts: Set<String> = ["resolver.example"]
+        XCTAssertThrowsError(
+            try CobaltCompatibleResolver(
+                endpoint: URL(string: "https://user:pass@resolver.example/api")!,
+                allowedEndpointHosts: hosts
+            )
+        )
+        XCTAssertThrowsError(
+            try CobaltCompatibleResolver(
+                endpoint: URL(string: "https://resolver.example:8443/api")!,
+                allowedEndpointHosts: hosts
+            )
+        )
+    }
+
 }
